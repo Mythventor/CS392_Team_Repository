@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { AlarmScheduler } from './scheduler';
 import { AlarmSound } from './sound';
 import { displayTime } from '../alarms/model';
+import { QR_MISMATCH_LIMIT, recordMismatchAttempt } from './verification';
 import './AlarmSystem.css';
 
 // scanAndVerify({ alarm, signal }) must resolve to literal true only for a valid QR.
-export default function AlarmSystem({ alarms, onOneShotFired, scanAndVerify }) {
+export default function AlarmSystem({ alarms, onOneShotFired, onFailsafe, scanAndVerify }) {
   const [scheduler] = useState(() => new AlarmScheduler());
   const [sound] = useState(() => new AlarmSound());
   const [queue, setQueue] = useState([]);
@@ -14,7 +15,9 @@ export default function AlarmSystem({ alarms, onOneShotFired, scanAndVerify }) {
   const [scanMessage, setScanMessage] = useState('');
   const [scanning, setScanning] = useState(false);
   const dialog = useRef(null);
+  const video = useRef(null);
   const scanController = useRef(null);
+  const mismatchAttempts = useRef(new Map());
   const current = queue[0];
   const ringing = queue.length > 0;
 
@@ -67,12 +70,27 @@ export default function AlarmSystem({ alarms, onOneShotFired, scanAndVerify }) {
     setScanning(true);
     setScanMessage('');
     try {
-      const verified = await scanAndVerify({ alarm: current, signal: controller.signal });
+      const verified = await scanAndVerify({ alarm: current, signal: controller.signal, video: video.current });
       if (controller.signal.aborted) return;
       if (verified === true) {
-        setQueue(previous => previous.filter(item => item.occurrenceId !== current.occurrenceId));
-        setScanMessage('QR verified. Alarm dismissed.');
-      } else setScanMessage('QR code did not match. The alarm is still ringing. Try again.');
+        const occurrenceKey = current.occurrenceId ?? current.id;
+        mismatchAttempts.current.delete(occurrenceKey);
+        setQueue(previous => previous.filter(item => (item.occurrenceId ?? item.id) !== occurrenceKey));
+        setScanMessage(`QR verified. ${current.label} was turned off.`);
+      } else {
+        const attemptKey = current.occurrenceId ?? current.id;
+        const now = Date.now();
+        const attempts = recordMismatchAttempt(mismatchAttempts.current.get(attemptKey) ?? [], now);
+        if (attempts.length >= QR_MISMATCH_LIMIT) {
+          mismatchAttempts.current.delete(attemptKey);
+          onFailsafe?.([current.id]);
+          setQueue(previous => previous.filter(item => (item.occurrenceId ?? item.id) !== attemptKey));
+          setScanMessage(`Failsafe activated. ${current.label} was disabled after three incorrect scans within five minutes.`);
+        } else {
+          mismatchAttempts.current.set(attemptKey, attempts);
+          setScanMessage('QR code did not match. The alarm is still ringing. Try again.');
+        }
+      }
     } catch {
       if (!controller.signal.aborted) setScanMessage('Could not scan the QR code. Check camera access and try again.');
     } finally {
@@ -81,6 +99,13 @@ export default function AlarmSystem({ alarms, onOneShotFired, scanAndVerify }) {
         setScanning(false);
       }
     }
+  }
+
+  function cancelScan() {
+    scanController.current?.abort();
+    scanController.current = null;
+    setScanning(false);
+    setScanMessage('Scan cancelled. The alarm is still ringing.');
   }
 
   return <section className="alarm-system" aria-label="Alarm system">
@@ -97,6 +122,8 @@ export default function AlarmSystem({ alarms, onOneShotFired, scanAndVerify }) {
       {queue.length > 1 && <p>{queue.length - 1} more alarm(s) waiting.</p>}
       {audioError && <><p role="alert">{audioError}</p><button className="secondary" onClick={enableSound}>Enable alarm sound</button></>}
       <button className="primary" onClick={verify} disabled={!scanAndVerify || scanning}>{scanning ? 'Scanning…' : 'Scan QR code'}</button>
+      {scanning && <button className="secondary" type="button" onClick={cancelScan}>Cancel scan</button>}
+      <video className="qr-camera-preview" ref={video} aria-label="QR code camera preview" autoPlay muted playsInline hidden={!scanning} />
       {!scanAndVerify && <p role="status">QR scanner is not connected yet. Person 3’s scanner must be integrated to dismiss this alarm.</p>}
       <p role="status">{scanMessage}</p>
     </dialog>}

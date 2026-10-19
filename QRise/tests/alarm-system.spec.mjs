@@ -42,12 +42,13 @@ test('scheduled alarm rings, rejects failed verification and stops only after su
   expect(await page.evaluate(() => window.audioStops)).toBe(0);
   await second.getByRole('button', { name: 'Scan QR code' }).click();
   await expect(second).toHaveCount(0);
+  await expect(page.getByText('QR verified. Second alarm was turned off.')).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.audioStops)).toBe(1);
   await page.clock.runFor(60000);
   await expect(dialog).toHaveCount(0);
 });
 
-test('preview connects alarm management to scheduling without a QR bypass', async ({ page }) => {
+test('preview connects alarm management to scheduling with the production QR scanner', async ({ page }) => {
   await page.clock.install({ time: new Date(2026, 9, 19, 6, 59, 50) });
   await page.goto('http://127.0.0.1:5173');
   await page.getByRole('button', { name: 'New alarm' }).click();
@@ -58,8 +59,39 @@ test('preview connects alarm management to scheduling without a QR bypass', asyn
   await page.clock.runFor(10000);
   const dialog = page.getByRole('dialog', { name: 'Integration alarm' });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Scan QR code' })).toBeDisabled();
+  await expect(dialog.getByRole('button', { name: 'Scan QR code' })).toBeEnabled();
   await expect(page.getByRole('checkbox', { name: 'Enable Integration alarm' })).not.toBeChecked();
   await page.setViewportSize({ width: 375, height: 812 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('three incorrect QR scans within five minutes trigger the failsafe', async ({ page }) => {
+  await page.clock.install({ time: new Date(2026, 9, 19, 6, 59, 50) });
+  await page.goto('http://127.0.0.1:5173');
+  await page.evaluate(async () => {
+    const { default: React } = await import('/node_modules/.vite/deps/react.js');
+    const { default: ReactDOM } = await import('/node_modules/.vite/deps/react-dom_client.js');
+    const { default: AlarmSystem } = await import('/src/alarm-system/AlarmSystem.jsx');
+    const host = document.createElement('div');
+    document.body.append(host);
+    ReactDOM.createRoot(host).render(React.createElement(AlarmSystem, {
+      alarms: [{ id: 'failsafe', label: 'Failsafe alarm', time: '07:00', days: [], enabled: true }],
+      onOneShotFired: () => {},
+      onFailsafe: ids => { window.failsafeIds = ids; },
+      scanAndVerify: async () => false,
+    }));
+  });
+  await page.getByRole('button', { name: 'Enable alarm sound' }).last().click();
+  await page.clock.runFor(10000);
+
+  const dialog = page.getByRole('dialog', { name: 'Failsafe alarm' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Scan QR code' }).click();
+  await expect(dialog).toContainText('did not match');
+  await dialog.getByRole('button', { name: 'Scan QR code' }).click();
+  await expect(dialog).toContainText('did not match');
+  await dialog.getByRole('button', { name: 'Scan QR code' }).click();
+  await expect(page.getByText(/Failsafe activated/)).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Failsafe alarm' })).toHaveCount(0);
+  expect(await page.evaluate(() => window.failsafeIds)).toEqual(['failsafe']);
 });

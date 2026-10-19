@@ -92,9 +92,30 @@
 .status-pill > span { width: 6px; height: 6px; border-radius: 50%; background: #c08b3e; }
 .qr-setup-copy .secondary { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--page); color: var(--subtle); font-size: 13px; }
 .qr-note { margin-top: 16px; color: var(--muted); font-size: 13px; }
+.qr-code-list { display: grid; gap: 16px; }
+.qr-code-card { display: flex; align-items: center; gap: 32px; padding: 28px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); }
+.qr-code-art { width: 240px; min-height: 240px; flex: 0 0 auto; display: grid; align-content: center; justify-items: center; gap: 8px; }
+.qr-code-image { display: block; width: 100%; height: auto; image-rendering: pixelated; }
+.qr-image-download { color: var(--accent-dark); font-size: 12px; }
+.qr-code-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.status-pill-ready { background: #eaf4e8; color: #42623b; }
+.status-pill-ready > span { background: #54834a; }
+.qr-camera-preview { width: 100%; max-height: 40dvh; object-fit: cover; border-radius: 10px; background: #211b17; }
+.qr-camera-preview[hidden] { display: none; }
 .app-footer { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--subtle); font-size: 11px; text-align: center; }
 .app-main > .alarm-management { max-width: 100%; margin: 0; }
 .app-main > .alarm-system { margin-top: 28px; padding: 16px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+
+@media print {
+  body * { visibility: hidden; }
+  .qr-code-card[data-printing="true"],
+  .qr-code-card[data-printing="true"] * { visibility: visible; }
+  .qr-code-card[data-printing="true"] { position: absolute; inset: 0 auto auto 0; width: 100%; border: 0; }
+  .qr-code-card[data-printing="true"] .qr-code-art { width: 100%; }
+  .qr-code-card[data-printing="true"] .qr-code-image { width: 320px; }
+  .qr-code-card[data-printing="true"] .qr-image-download,
+  .qr-code-card[data-printing="true"] .qr-code-actions { display: none; }
+}
 
 @media (max-width: 720px) {
   .app-header { min-height: 68px; padding: 0 20px; gap: 16px; justify-content: space-between; }
@@ -110,6 +131,9 @@
   .qr-setup-card { align-items: flex-start; gap: 22px; padding: 24px; }
   .qr-placeholder { width: 120px; height: 120px; }
   .qr-placeholder-icon { font-size: 58px; }
+  .qr-code-card { align-items: flex-start; gap: 22px; padding: 24px; }
+  .qr-code-art { width: 120px; min-height: 120px; }
+  .qr-code-image { width: 120px; }
 }
 @media (max-width: 480px) {
   .brand { gap: 8px; font-size: 18px; }
@@ -122,6 +146,9 @@
   .overview-card { padding: 18px; }
   .qr-setup-card { flex-direction: column; }
   .qr-placeholder { width: 100%; height: 125px; }
+  .qr-code-card { flex-direction: column; }
+  .qr-code-art { width: 100%; min-height: 160px; }
+  .qr-code-image { width: min(100%, 220px); }
   .page-heading h1 { font-size: 30px; }
   .app-main > .alarm-system { padding: 14px; }
 }

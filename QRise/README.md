@@ -16,7 +16,7 @@ npm ci
 npm run dev
 ```
 
-`src/App.jsx` provides the home dashboard and Home, Alarms, and QR code navigation. Alarm changes are saved in browser local storage and restored on reload. The QR code screen is currently a placeholder: QR creation, QR-code persistence, and camera scanning are not connected yet. Scheduler state resets when the page reloads.
+`src/App.jsx` provides the home dashboard and Home, Alarms, and QR code navigation. Alarm settings and QR-to-alarm pairings are saved in browser local storage and restored on reload. The QR code screen creates a unique printable/downloadable code per alarm. Scanning uses the device camera; camera access requires a secure browser context (HTTPS or localhost). Scheduler and ringing state reset when the page reloads.
 
 If saved alarm data is unavailable or unreadable, QRise displays an error and starts with an empty in-memory schedule. If the browser blocks storage or saving fails, the app keeps the current session usable and reports that changes could not be saved.
 
@@ -38,6 +38,12 @@ Time is a local 24-hour `HH:mm` string. Repeat days use Sunday = 0 through Satur
 
 Scheduling, triggering, sound, and QR-gated ringing/dismissal are implemented in `src/alarm-system/`. The alarm management component remains separate from the app shell and scheduler.
 
+## Person 3: QR codes and verification
+
+On the QR code screen, generate a code for each alarm and print it or download its PNG image. Replacing a code invalidates the previous one. Pairings are stored separately from alarm settings in local storage. Scan is available while an alarm is ringing; the live camera preview appears inside the ringing dialog. A code dismisses only the alarm it is paired with. A mismatch shows an error and leaves the alarm ringing; after three mismatches for the same ringing occurrence in a rolling five-minute window, the failsafe disables and dismisses that alarm. Camera errors can be retried, and cancelling a scan does not count as a mismatch. Camera tracks are stopped after a scan completes or is cancelled.
+
+QR codes contain an opaque random identifier, not alarm details. Pairing records are local to this browser, so clearing browser storage or moving the app to another device requires generating new codes there. This browser implementation cannot dismiss an alarm after a page refresh because the in-memory ringing queue is not restored.
+
 ## Verify this feature
 
 ```sh
@@ -48,7 +54,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Tests cover alarm management, local alarm persistence, navigation, scheduling, ringing, audio start/stop, failed verification, and successful dismissal using a test scanner adapter. Real camera scanning and QR-code persistence await integration.
+Tests cover alarm management, local alarm and QR-pairing persistence, navigation, scheduling, ringing, audio start/stop, failed verification, failsafe behavior, and successful dismissal using a test scanner adapter. Real camera access requires a device/browser permission and should be verified on the target hardware.
 
 
 ## Person 2: Alarm System
@@ -66,13 +72,15 @@ Mount `AlarmSystem` once at the app root, including while navigating between scr
   alarms={alarms}
   onOneShotFired={disableOneShots}
   scanAndVerify={scanAndVerify}
+  onFailsafe={disableAlarms}
 />
 ```
 
 - `alarms` uses Person 1’s existing model. Times and repeat days use the device’s local timezone.
 - `onOneShotFired(ids)` must disable the provided alarm IDs in parent state (and persist them when storage is added). The preview implements this. Disabling a consumed alarm does not dismiss its ringing screen.
-- Person 3 supplies `async scanAndVerify({ alarm, signal })`. Open the camera UI, validate against the user's registered QR code, and resolve to literal `true` only after a match. Resolve `false` for a mismatch or cancellation; reject on camera/scanner errors. Failures leave sound running and permit retry. Honor the AbortSignal and release camera tracks when finished or aborted. Render scanner UI inside the ringing dialog (for example, portal into `.ringing-dialog`) so the modal does not make it inert.
-- No scanner is mocked into the shipped app. Without the adapter the scan button is disabled and the screen explains the missing integration. The automated browser test alone supplies a fake verifier.
+- Person 3 supplies `async scanAndVerify({ alarm, signal })`. Open the camera UI, validate against the user's registered QR code, and resolve to literal `true` only after a match. Resolve `false` for a mismatch or cancellation; reject on camera/scanner errors. Failures leave sound running and permit retry. Honor the AbortSignal and release camera tracks when finished or aborted. Render scanner UI inside the ringing dialog (for example, portal into `.ringing-dialog`) so the modal does not make it inert. The app passes the dialog's video element as an additional `video` property.
+- `onFailsafe(ids)` disables the provided alarms in parent state after three incorrect scans for a ringing occurrence within five minutes; the active occurrence is dismissed so sound can stop when the queue is empty.
+- No scanner is mocked into the shipped app. The production app wires the camera scanner and local QR pairing validator; automated browser tests may supply a fake verifier.
 - Simultaneous alarms queue in order. Verification dismisses only the current occurrence; sound continues until the queue is empty. Active ringing survives edits/deletion of the underlying alarm.
 
 A one-time alarm schedules at the next future occurrence of its time (tomorrow if today's time has passed). Repeating alarms select the next configured local weekday. Timers check every 500 ms and on focus/visibility changes. A delayed check rings overdue alarms once and advances repeating alarms to the next future occurrence, rather than replaying every missed day. Editing time/repeat days reschedules; disabling or deleting cancels pending occurrences. Scheduler state is in memory, so Person 4 must consider restoration and clock/timezone changes in final integration.

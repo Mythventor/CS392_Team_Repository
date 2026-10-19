@@ -1,9 +1,11 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import QRCode from "qrcode";
 import AlarmManagement from "./alarms/AlarmManagement";
 import { displayTime } from "./alarms/model";
 import { nextOccurrence } from "./alarm-system/scheduler";
 import AlarmSystem from "./alarm-system/AlarmSystem";
-import { readAlarms, writeAlarms } from "./storage";
+import { readAlarms, readQrCodes, writeAlarms, writeQrCodes } from "./storage";
+import { createQrPayload, findMatchingQrCode } from "./qr/model";
 import "./App.css";
 
 function getInitialAlarms() {
@@ -42,6 +44,46 @@ function Navigation({ page, onNavigate }) {
   );
 }
 
+function getInitialQrCodes() {
+  try {
+    return { qrCodes: readQrCodes(), error: "" };
+  } catch {
+    return {
+      qrCodes: [],
+      error: "Saved QR codes could not be loaded. Generate a code to replace the saved data.",
+    };
+  }
+}
+
+function QrCodeImage({ qrCode, alarmLabel }) {
+  const [image, setImage] = useState("");
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let current = true;
+    QRCode.toDataURL(createQrPayload(qrCode.id), {
+      errorCorrectionLevel: "H",
+      margin: 2,
+      width: 240,
+    }).then((url) => {
+      if (current) setImage(url);
+    }).catch(() => {
+      if (current) setError("This QR code image could not be generated.");
+    });
+    return () => { current = false; };
+  }, [qrCode.id]);
+
+  if (error) return <p role="alert">{error}</p>;
+  return image
+    ? <>
+      <img className="qr-code-image" src={image} alt={`QR code paired with ${alarmLabel}`} />
+      <a className="qr-image-download" href={image} download={`qrise-${alarmLabel.replace(/[^a-z0-9]+/gi, "-").toLowerCase() || "alarm"}.png`}>
+        Download image
+      </a>
+    </>
+    : <p role="status">Preparing QR code…</p>;
+}
+
 function HomeDashboard({ alarms }) {
   const nextAlarm = useMemo(() => {
     const now = new Date();
@@ -59,7 +101,7 @@ function HomeDashboard({ alarms }) {
         <div className="welcome-copy">
           <p className="eyebrow">A better morning starts tonight</p>
           <h1 id="welcome-title">Rise with intention.</h1>
-          <p>Set your alarms here. When QR scanning is connected, you’ll get moving to turn them off.</p>
+          <p>Pair alarms with printed QR codes, then get moving to scan one when it is time to rise.</p>
         </div>
         <div className="welcome-art" aria-hidden="true">
           <span className="sun-orbit" />
@@ -104,41 +146,68 @@ function HomeDashboard({ alarms }) {
   );
 }
 
-function QrSetup() {
+function QrSetup({ alarms, qrCodes, onCreate, onPrint, printingCode }) {
   return (
     <section className="qr-page" aria-labelledby="qr-title">
       <div className="page-heading">
         <p className="eyebrow">Make getting up a little more active</p>
         <h1 id="qr-title">Your QR code</h1>
-        <p>Scan a code to dismiss a ringing alarm. QR setup is not connected yet.</p>
+        <p>Generate a unique code for each alarm, then print or save it somewhere you will need to get up to reach.</p>
       </div>
-      <article className="qr-setup-card">
-        <div className="qr-placeholder" aria-hidden="true">
-          <span className="qr-placeholder-icon">▦</span>
+      {!alarms.length ? (
+        <p className="qr-note">Create an alarm before generating its QR code.</p>
+      ) : (
+        <div className="qr-code-list">
+          {alarms.map((alarm) => {
+            const qrCode = qrCodes.find((item) => item.alarmId === alarm.id);
+            return (
+              <article
+                className="qr-code-card"
+                data-printing={printingCode === alarm.id ? "true" : undefined}
+                key={alarm.id}
+              >
+                <div className="qr-code-art">
+                  {qrCode
+                    ? <QrCodeImage qrCode={qrCode} alarmLabel={alarm.label} />
+                    : <div className="qr-placeholder" aria-hidden="true"><span className="qr-placeholder-icon">▦</span></div>}
+                </div>
+                <div className="qr-setup-copy">
+                  <span className={`status-pill${qrCode ? " status-pill-ready" : ""}`}>
+                    <span />{qrCode ? "Ready to print" : "Not set up"}
+                  </span>
+                  <h2>{alarm.label}</h2>
+                  <p>
+                    {qrCode
+                      ? "This unique code is paired with this alarm. Scan it while this alarm is ringing to turn it off."
+                      : "Create a one-of-a-kind code paired with this alarm. You can replace it later; the previous code will stop working."}
+                  </p>
+                  <div className="qr-code-actions">
+                    <button className="primary" type="button" onClick={() => onCreate(alarm)}>
+                      {qrCode ? "Replace QR code" : "Generate QR code"}
+                    </button>
+                    {qrCode && (
+                      <button className="secondary" type="button" onClick={() => onPrint(alarm.id)}>Print QR code</button>
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
         </div>
-        <div className="qr-setup-copy">
-          <span className="status-pill"><span /> Not set up</span>
-          <h2>QR tools are coming soon</h2>
-          <p>
-            QR code creation, saving, and camera scanning will be available when the QR feature is integrated.
-            Your alarms can still be created and scheduled in the meantime.
-          </p>
-          <button className="secondary" type="button" disabled>
-            QR setup unavailable
-          </button>
-        </div>
-      </article>
-      <p className="qr-note" role="status">
-        Ringing alarms currently require a connected QR scanner to dismiss.
-      </p>
+      )}
+      <p className="qr-note" role="status">Camera access is requested only when you choose to scan a code. Saved QR pairings stay on this device.</p>
     </section>
   );
 }
 
 export default function App() {
   const [initial] = useState(getInitialAlarms);
+  const [initialQr] = useState(getInitialQrCodes);
   const [alarms, setAlarms] = useState(initial.alarms);
+  const [qrCodes, setQrCodes] = useState(initialQr.qrCodes);
   const [storageError, setStorageError] = useState(initial.error);
+  const [qrStorageError, setQrStorageError] = useState(initialQr.error);
+  const [printingCode, setPrintingCode] = useState("");
   const [page, setPage] = useState("home");
 
   const updateAlarms = useCallback((nextAlarms) => {
@@ -151,11 +220,46 @@ export default function App() {
     }
   }, []);
 
-  const disableOneShots = useCallback((ids) => {
+  const disableAlarms = useCallback((ids) => {
     updateAlarms(
       alarms.map((alarm) => ids.includes(alarm.id) ? { ...alarm, enabled: false } : alarm),
     );
   }, [alarms, updateAlarms]);
+
+  const saveQrCodes = useCallback((nextQrCodes) => {
+    setQrCodes(nextQrCodes);
+    try {
+      writeQrCodes(nextQrCodes);
+      setQrStorageError("");
+    } catch {
+      setQrStorageError("Your QR code changes are active for this session but could not be saved on this device.");
+    }
+  }, []);
+
+  const createQrCode = useCallback((alarm) => {
+    const id = crypto.randomUUID();
+    saveQrCodes([
+      ...qrCodes.filter((qrCode) => qrCode.alarmId !== alarm.id),
+      { id, alarmId: alarm.id },
+    ]);
+  }, [qrCodes, saveQrCodes]);
+
+  const scanAndVerify = useCallback(async ({ alarm, signal, video }) => {
+    const { scanQrCode } = await import("./qr/scanner");
+    const payload = await scanQrCode({ video, signal });
+    if (payload === null || signal.aborted) return false;
+    return findMatchingQrCode(payload, qrCodes, alarm.id) !== null;
+  }, [qrCodes]);
+
+  useEffect(() => {
+    if (!printingCode) return undefined;
+    function finishPrint() {
+      setPrintingCode("");
+    }
+    window.addEventListener("afterprint", finishPrint);
+    window.print();
+    return () => window.removeEventListener("afterprint", finishPrint);
+  }, [printingCode]);
 
   return (
     <div className="app-shell">
@@ -169,15 +273,27 @@ export default function App() {
       </header>
       <main className="app-main">
         {storageError && <p className="storage-alert" role="alert">{storageError}</p>}
+        {qrStorageError && <p className="storage-alert" role="alert">{qrStorageError}</p>}
         {page === "qr" ? (
-          <QrSetup />
+          <QrSetup
+            alarms={alarms}
+            qrCodes={qrCodes}
+            onCreate={createQrCode}
+            onPrint={setPrintingCode}
+            printingCode={printingCode}
+          />
         ) : (
           <>
             {page === "home" && <HomeDashboard alarms={alarms} />}
             <AlarmManagement alarms={alarms} onChange={updateAlarms} />
           </>
         )}
-        <AlarmSystem alarms={alarms} onOneShotFired={disableOneShots} />
+        <AlarmSystem
+          alarms={alarms}
+          onOneShotFired={disableAlarms}
+          onFailsafe={disableAlarms}
+          scanAndVerify={scanAndVerify}
+        />
         <footer className="app-footer">QRise · Plan a better morning</footer>
       </main>
     </div>
