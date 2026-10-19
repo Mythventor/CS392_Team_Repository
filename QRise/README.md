@@ -166,4 +166,4 @@ npm run build
 firebase deploy --only hosting
 ```
 
-The command prints the live `https://<project-id>.web.app` URL. Firebase Hosting serves over HTTPS, so camera scanning works on phones.
+The command prints the live `https://<project-id>.web.app](https://cs392-react-challenge-692dd.web.app` URL. Firebase Hosting serves over HTTPS, so camera scanning works on phones.
