@@ -3,11 +3,9 @@ import babel from '@rolldown/plugin-babel'
 import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
-export default defineConfig(({ command }) => ({
-  // GitHub Pages serves the site from /CS392_Team_Repository/; dev stays at /.
-  base: command === 'build' ? '/CS392_Team_Repository/' : '/',
+export default defineConfig({
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],
-}))
+})

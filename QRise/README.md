@@ -148,8 +148,22 @@ Unit tests (`npm test`) cover storage save/restore and validation, the alarm mod
 
 ## Deployment
 
-The app is deployed to GitHub Pages by `.github/workflows/deploy.yml` at the repository root. Every push to `main` runs the unit tests, builds `QRise/`, and publishes `QRise/dist`. Production builds use the base path `/CS392_Team_Repository/` (set in `vite.config.js`); local development still runs at `/`.
+QRise is deployed with Firebase Hosting. `firebase.json` serves the Vite build output (`dist/`) and sends every path to `index.html`.
 
-Live site: https://mythventor.github.io/CS392_Team_Repository/
+One-time setup (requires access to the team's Firebase project):
 
-Pages serves over HTTPS, so camera scanning works on phones.
+```sh
+npm install -g firebase-tools
+firebase login
+firebase use --add   # pick the team's Firebase project; this writes .firebaserc
+```
+
+Deploy from the `QRise/` folder:
+
+```sh
+npm ci
+npm run build
+firebase deploy --only hosting
+```
+
+The command prints the live `https://<project-id>.web.app` URL. Firebase Hosting serves over HTTPS, so camera scanning works on phones.
