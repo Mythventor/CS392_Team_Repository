@@ -1,0 +1,35 @@
+.alarm-management { max-width: 680px; margin: 24px auto; color: #223d36; }
+.section-heading, .alarm-card, .dialog-heading, .enable-field { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.section-heading { margin-bottom: 24px; }
+.section-heading h1 { font-size: 24px; font-weight: 600; }
+.primary, .secondary, .icon-button { border: 1px solid #c9d9cd; border-radius: 8px; padding: 10px 14px; color: #284b36; background: white; }
+.primary { background: #28513e; border-color: #28513e; color: white; }
+.alarm-list { display: grid; gap: 12px; }
+.alarm-card { border: 1px solid #d5e0d7; background: white; border-radius: 12px; padding: 20px; }
+.alarm-time { font-size: 36px; font-variant-numeric: tabular-nums; }
+.alarm-time span { font-size: 15px; }
+.alarm-card h2 { font-size: 15px; margin: 8px 0; overflow-wrap: anywhere; }
+.alarm-card p, .empty { color: #587362; font-size: 14px; }
+.alarm-actions { display: grid; gap: 14px; flex-shrink: 0; }
+.row-actions { display: flex; gap: 8px; }
+.toggle { font-size: 13px; display: flex; gap: 8px; align-items: center; max-width: 220px; overflow-wrap: anywhere; }
+input[type=checkbox] { accent-color: #28513e; width: 20px; height: 20px; flex-shrink: 0; }
+.empty { padding: 32px 16px; border: 1px dashed #c9d9cd; border-radius: 12px; text-align: center; }
+.alarm-management dialog { border: 1px solid #dbe6de; border-radius: 16px; padding: 26px; width: min(480px, calc(100vw - 24px)); max-height: 90dvh; color: #223d36; background: #fcfdfc; }
+.alarm-management dialog::backdrop { background: #142c255c; }
+.dialog-heading h2 { font-size: 24px; }
+.field { display: block; font-size: 14px; font-weight: 600; margin-top: 20px; }
+.field input { display: block; width: 100%; margin-top: 9px; border: 1px solid #c9d9cd; background: white; color: #284b36; padding: 12px; border-radius: 8px; }
+.field .time-input { font-size: 34px; }
+.alarm-management fieldset { padding: 0; border: 0; margin: 24px 0; }
+.alarm-management legend { font-size: 14px; font-weight: 600; width: 100%; margin-bottom: 12px; }
+.alarm-management legend span { float: right; font-size: 12px; color: #587362; font-weight: 400; }
+.days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+.days button { padding: 12px 0; border: 1px solid #c9d9cd; border-radius: 8px; background: white; color: #284b36; font-size: 12px; }
+.days button[aria-pressed=true] { background: #28513e; color: white; border-color: #28513e; }
+.presets { display: flex; gap: 16px; margin-top: 12px; }
+.presets button { background: none; border: 0; font-size: 12px; color: #28513e; padding: 5px 0; text-decoration: underline; }
+.enable-field { font-size: 14px; }
+.enable-field small { display: block; font-size: 12px; color: #587362; margin-top: 5px; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 28px; }
+@media(max-width: 540px) { .alarm-card { align-items: flex-start; flex-direction: column; } .alarm-actions { width: 100%; } .row-actions { justify-content: flex-end; } .field .time-input { font-size: 28px; } .days button { font-size: 11px; } }

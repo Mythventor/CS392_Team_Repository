@@ -1,19 +1,49 @@
-# React + Vite
+# QRise · Person 1: Alarm Management
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This contribution contains the alarm settings feature only:
 
-Currently, two official plugins are available:
+- Create, edit, and delete alarms.
+- Set alarm times and repeat days.
+- Enable and disable alarms.
+- Provide an accessible alarm settings form and alarm list.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Run the feature preview
 
-## React Compiler
+Use Node.js 22.12+ (or a supported newer release).
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+```sh
+npm ci
+npm run dev
+```
 
-Note: This will impact Vite dev & build performances.
-You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
+`src/App.jsx` is a minimal preview host with temporary React state. Alarms reset when the page reloads.
 
-## Expanding the ESLint configuration
+## Component interface
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+`src/alarms/AlarmManagement.jsx` exports a controlled component:
+
+```jsx
+<AlarmManagement alarms={alarms} onChange={setAlarms} />
+```
+
+The parent supplies the array and receives the updated array after create, edit, delete, or enable/disable actions. Each alarm has this shape:
+
+```js
+{ id: 'uuid', label: 'Morning alarm', time: '07:00', days: [1, 2, 3, 4, 5], enabled: true }
+```
+
+Time is a local 24-hour `HH:mm` string. Repeat days use Sunday = 0 through Saturday = 6; an empty array means no repeat. The settings form defaults new alarms to weekdays at 07:00, enabled. Nothing is created until Save alarm is selected.
+
+Person 2 owns scheduling, triggering, sounds, and ringing/dismissal. Person 3 owns QR generation and scanning. Person 4 owns the home screen, navigation, local storage, and app integration. This component implements none of those systems.
+
+## Verify this feature
+
+```sh
+npm test
+npm run lint
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
+
+Tests cover time/repeat labels and the alarm management controls. They do not test the full app workflow.
