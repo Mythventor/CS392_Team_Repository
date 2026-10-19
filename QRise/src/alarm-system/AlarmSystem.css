@@ -1,0 +1,12 @@
+.alarm-system { display: grid; gap: 12px; margin-top: 24px; font-size: 14px; }
+.alarm-system > button { justify-self: start; }
+.alarm-system > p { color: #587362; line-height: 1.5; }
+.ringing-dialog { width: min(480px, calc(100vw - 24px)); max-height: 90dvh; overflow: auto; padding: 28px; border: 1px solid #c9d9cd; border-radius: 18px; color: #223d36; background: #fcfdfc; }
+.ringing-dialog::backdrop { background: #142c25db; }
+.ringing-dialog > * + * { margin-top: 20px; }
+.ringing-dialog h2 { overflow-wrap: anywhere; }
+.ringing-dialog p { line-height: 1.5; }
+.ringing-dialog button { width: 100%; }
+.ringing-dialog button:disabled { opacity: .6; cursor: wait; }
+.ringing-eyebrow { text-transform: uppercase; letter-spacing: .12em; font-size: 12px; }
+.ringing-time { font-size: 44px; font-variant-numeric: tabular-nums; }
