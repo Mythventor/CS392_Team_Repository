@@ -86,3 +86,70 @@ Mount `AlarmSystem` once at the app root, including while navigating between scr
 A one-time alarm schedules at the next future occurrence of its time (tomorrow if today's time has passed). Repeating alarms select the next configured local weekday. Timers check every 500 ms and on focus/visibility changes. A delayed check rings overdue alarms once and advances repeating alarms to the next future occurrence, rather than replaying every missed day. Editing time/repeat days reschedules; disabling or deleting cancels pending occurrences. Scheduler state is in memory, so Person 4 must consider restoration and clock/timezone changes in final integration.
 
 Files: `scheduler.js` handles scheduling, `sound.js` handles audio, and `AlarmSystem.jsx` handles the queue, ringing screen, and verification bridge.
+
+## Person 4: App UI & Integration
+
+Person 4 provides the app shell and connects the alarm settings, alarm system, and QR verification features into one workflow:
+
+- Build the home screen and navigation.
+- Implement local storage for alarms and QR codes.
+- Connect all features together.
+- Handle errors and test the complete app workflow.
+
+### Home screen and navigation
+
+`src/App.jsx` renders the header, the Home / Alarms / QR code navigation, and the home dashboard. The dashboard shows the next scheduled alarm (time, label, and weekday, using the scheduler's `nextOccurrence`) and how many alarms are on or off. The alarm list and settings form appear on the Home and Alarms screens; the QR code screen lists every alarm with its pairing status. `AlarmSystem` is mounted once, outside the page switch, so scheduling and ringing continue while the user moves between screens.
+
+### Local storage
+
+`src/storage.js` saves alarms under `qrise.alarms` and QR pairings under `qrise.qrCodes` in browser local storage, and `App.jsx` restores both on load. Saved data is validated before use: alarms must match Person 1's model (valid `HH:mm` time, days 0–6, boolean `enabled`), and each QR pairing needs a UUID code ID with no duplicate codes or duplicate alarm pairings. Pairings are stored separately from alarm settings, so replacing a QR code does not change the alarm itself.
+
+### Integration
+
+`App.jsx` owns the `alarms` and `qrCodes` state and wires the features together:
+
+```jsx
+<AlarmManagement alarms={alarms} onChange={updateAlarms} />
+<AlarmSystem
+  alarms={alarms}
+  onOneShotFired={disableAlarms}
+  onFailsafe={disableAlarms}
+  scanAndVerify={scanAndVerify}
+/>
+```
+
+- `updateAlarms` updates state and persists the new array.
+- `disableAlarms(ids)` turns off the given alarms and persists the change; it handles both consumed one-time alarms and the failsafe.
+- `scanAndVerify` lazy-loads Person 3's camera scanner (`src/qr/scanner.js`), scans into the ringing dialog's video element, and returns `true` only when `findMatchingQrCode` finds the code paired with the ringing alarm.
+
+### Error handling
+
+- If saved alarms or QR pairings are missing, unreadable, or invalid, QRise shows an alert and starts with an empty list instead of crashing. Saving new data replaces the bad data.
+- If the browser blocks storage or a save fails, changes stay active for the current session and the app reports that they could not be saved on this device. Alarm and QR storage errors are reported separately.
+- If a QR code image cannot be generated, the card shows an error instead of a broken image.
+- Camera errors during verification can be retried without stopping the alarm.
+
+### Known limitations
+
+Scheduler and ringing state are in memory. A page refresh restores saved alarms and pairings but clears any currently ringing alarm, so it cannot be dismissed after a refresh. Clock and timezone changes are picked up on the scheduler's next check (every 500 ms and on focus/visibility changes) rather than handled as a separate event. Reliable locked-phone wake-up requires a native app.
+
+### End-to-end testing
+
+The Playwright suite (`npm run test:e2e`) covers the complete workflow:
+
+- Creating, editing, toggling, and deleting alarms.
+- Home navigation, alarm persistence across reload, and printable QR pairing working together.
+- Storage failures being announced while alarm controls stay usable.
+- A scheduled alarm ringing, rejecting failed verification, and stopping only after success.
+- Alarm management connected to scheduling with the production QR scanner.
+- Three incorrect scans within five minutes triggering the failsafe.
+
+Unit tests (`npm test`) cover storage save/restore and validation, the alarm model, the scheduler, QR matching, and the failsafe window.
+
+## Deployment
+
+The app is deployed to GitHub Pages by `.github/workflows/deploy.yml` at the repository root. Every push to `main` runs the unit tests, builds `QRise/`, and publishes `QRise/dist`. Production builds use the base path `/CS392_Team_Repository/` (set in `vite.config.js`); local development still runs at `/`.
+
+Live site: https://mythventor.github.io/CS392_Team_Repository/
+
+Pages serves over HTTPS, so camera scanning works on phones.
