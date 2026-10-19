@@ -16,7 +16,9 @@ npm ci
 npm run dev
 ```
 
-`src/App.jsx` connects alarm management to Person 2’s alarm system with temporary React state. Alarms and scheduler state reset when the page reloads.
+`src/App.jsx` provides the home dashboard and Home, Alarms, and QR code navigation. Alarm changes are saved in browser local storage and restored on reload. The QR code screen is currently a placeholder: QR creation, QR-code persistence, and camera scanning are not connected yet. Scheduler state resets when the page reloads.
+
+If saved alarm data is unavailable or unreadable, QRise displays an error and starts with an empty in-memory schedule. If the browser blocks storage or saving fails, the app keeps the current session usable and reports that changes could not be saved.
 
 ## Component interface
 
@@ -34,7 +36,7 @@ The parent supplies the array and receives the updated array after create, edit,
 
 Time is a local 24-hour `HH:mm` string. Repeat days use Sunday = 0 through Saturday = 6; an empty array means no repeat. The settings form defaults new alarms to weekdays at 07:00, enabled. Nothing is created until Save alarm is selected.
 
-Person 2 implements scheduling, triggering, sound, and QR-gated ringing/dismissal in `src/alarm-system/`. Person 3 owns QR generation and scanning. Person 4 owns the home screen, navigation, local storage, and app integration. The alarm management component remains separate from those systems.
+Scheduling, triggering, sound, and QR-gated ringing/dismissal are implemented in `src/alarm-system/`. The alarm management component remains separate from the app shell and scheduler.
 
 ## Verify this feature
 
@@ -46,7 +48,7 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-Tests cover alarm management, scheduling, ringing, audio start/stop, failed verification, and successful dismissal using a test scanner adapter. Real camera scanning and persistence await integration.
+Tests cover alarm management, local alarm persistence, navigation, scheduling, ringing, audio start/stop, failed verification, and successful dismissal using a test scanner adapter. Real camera scanning and QR-code persistence await integration.
 
 
 ## Person 2: Alarm System

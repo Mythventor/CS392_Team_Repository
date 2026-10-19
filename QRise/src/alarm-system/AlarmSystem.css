@@ -1,8 +1,8 @@
 .alarm-system { display: grid; gap: 12px; margin-top: 24px; font-size: 14px; }
 .alarm-system > button { justify-self: start; }
-.alarm-system > p { color: #587362; line-height: 1.5; }
-.ringing-dialog { width: min(480px, calc(100vw - 24px)); max-height: 90dvh; overflow: auto; padding: 28px; border: 1px solid #c9d9cd; border-radius: 18px; color: #223d36; background: #fcfdfc; }
-.ringing-dialog::backdrop { background: #142c25db; }
+.alarm-system > p { color: #796b5b; line-height: 1.5; }
+.ringing-dialog { width: min(480px, calc(100vw - 24px)); max-height: 90dvh; overflow: auto; padding: 28px; border: 1px solid #eadfce; border-radius: 18px; color: #382b21; background: #fffdfa; }
+.ringing-dialog::backdrop { background: #382b21db; }
 .ringing-dialog > * + * { margin-top: 20px; }
 .ringing-dialog h2 { overflow-wrap: anywhere; }
 .ringing-dialog p { line-height: 1.5; }
