@@ -148,14 +148,21 @@ Unit tests (`npm test`) cover storage save/restore and validation, the alarm mod
 
 ## Deployment
 
-QRise is deployed with Firebase Hosting. `firebase.json` serves the Vite build output (`dist/`) and sends every path to `index.html`.
+QRise is deployed with Firebase Hosting as its own site, **qrise-cs392**, inside the team's Firebase project (`cs392-react-challenge-692dd`), so it has a separate URL from the other CS 392 React app. `firebase.json` serves the Vite build output (`dist/`) to that site and sends every path to `index.html`.
+
+Live site: [https://qrise-cs392.web.app](https://qrise-cs392.web.app)
 
 One-time setup (requires access to the team's Firebase project):
 
 ```sh
 npm install -g firebase-tools
 firebase login
-firebase use --add   # pick the team's Firebase project; this writes .firebaserc
+```
+
+The `.firebaserc` file already selects the project. The `qrise-cs392` site only needs to be created once:
+
+```sh
+firebase hosting:sites:create qrise-cs392
 ```
 
 Deploy from the `QRise/` folder:
@@ -166,6 +173,4 @@ npm run build
 firebase deploy --only hosting
 ```
 
-Live site: [https://cs392-react-challenge-692dd.web.app](https://cs392-react-challenge-692dd.web.app)
-
-`firebase deploy` prints this URL when it finishes. Firebase Hosting serves over HTTPS, so camera scanning works on phones.
+Firebase Hosting serves over HTTPS, so camera scanning works on phones.
