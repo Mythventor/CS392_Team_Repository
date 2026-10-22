@@ -47,3 +47,11 @@ The landing page includes no forms, analytics SDKs, remote fonts, or remotely lo
 ## Manual checks
 
 Check the three walkthrough buttons, FAQ expansion, anchor navigation, and app URLs. Check narrow phone and desktop layouts, keyboard focus, image loading, and browser console errors. The actual app's alarm workflow has its own tests in `../QRise/tests`.
+
+## GitHub Pages deployment
+
+Live introduction: https://mythventor.github.io/CS392_Team_Repository/
+
+The repository uses GitHub Actions as its Pages source. `.github/workflows/deploy-landing-page.yml` builds only `QRise_Ads` and publishes its `dist` artifact whenever landing-page files change on `main`. It can also be run manually from Actions. The Vite base path is `/CS392_Team_Repository/`, so local preview URLs include that path too.
+
+The alarm application stays at https://qrise-cs392.web.app. GitHub Pages hosts this introduction; Google/Firebase hosts the linked app.
