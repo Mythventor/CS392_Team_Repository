@@ -31,9 +31,13 @@ jobs:
       - uses: actions/configure-pages@v5
       - run: npm ci
       - run: npm run build
+      - name: Place landing page in its public subdirectory
+        run: |
+          mkdir -p "$RUNNER_TEMP/qrise-pages/QRise_Ad"
+          cp -R dist/. "$RUNNER_TEMP/qrise-pages/QRise_Ad/"
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: QRise_Ads/dist
+          path: ${{ runner.temp }}/qrise-pages
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -42,7 +46,7 @@ jobs:
       id-token: write
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment.outputs.page_url }}QRise_Ad/
     steps:
       - name: Deploy
         id: deployment

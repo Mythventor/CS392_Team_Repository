@@ -4,7 +4,7 @@ import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: "/CS392_Team_Repository/",
+  base: "/CS392_Team_Repository/QRise_Ad/",
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] })
