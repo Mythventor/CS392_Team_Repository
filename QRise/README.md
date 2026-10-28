@@ -162,6 +162,7 @@ QRise also takes attendance. An organizer creates an event, shows or prints its 
 - Choose when check-in opens (default 30 minutes before) and when arrivals count as late (default 10 minutes after the start).
 - Edit the time or repeat days at any time; past check-ins stay attached to the dates they happened on.
 - Add expected people by name, or share the **invite link** so people can join the list themselves.
+- **Import from file**: upload a spreadsheet (.xlsx), CSV/TSV, or text file (one name per line). QRise finds the names automatically: it looks for a "Name" / "Full name" / "Student" column, combines "First name" + "Last name" columns, or picks the column whose values look most like names, and ignores IDs, emails, and blank rows. "Lee, Ana" becomes "Ana Lee". A preview lets you change the column, untick people, and see who is skipped because they're already on the list. Old .xls files must be saved as .xlsx or .csv first; Google Sheets can be downloaded as .xlsx or .csv. Up to 500 people per event.
 - Watch the **Here** list (name, time stamp, On time / Late) and the **Absent** list update live. People who scan in without being on the list are added automatically and tagged "Added at check-in".
 - Mark someone present by hand or undo a check-in, and look back at past dates or ahead to upcoming ones.
 - **Replace code** invalidates the printed QR code, for example if a photo of it was shared.
@@ -170,6 +171,7 @@ QRise also takes attendance. An organizer creates an event, shows or prints its 
 
 ### How it works
 
+- `src/checkin/importNames.js`: reads uploaded files (using the `read-excel-file` library for .xlsx) and detects which column holds names.
 - `src/checkin/model.js`: scheduling (one-time and repeating dates, check-in windows, late cutoff), attendance lists, and links.
 - `src/checkin/CheckIn.jsx`: the Check-in tab, event editor, organizer view, attendee check-in page, and invite page.
 - `src/checkin/firestoreBackend.js`: stores events in Cloud Firestore. Each device signs in with Firebase Anonymous Authentication, so nobody creates an account, but the database still knows who owns each event.
@@ -213,7 +215,7 @@ VITE_FIREBASE_APP_ID=...
 
 ### Tests
 
-`tests/checkin-model.test.mjs` covers scheduling, repeats, late marking, and attendance merging. `tests/checkin.spec.mjs` runs a full organizer and attendee session in the browser: invite link, on-time and late check-ins with time stamps, walk-ins, marking present, replacing the code, changing the time, and an event scheduled ahead. The Firestore rules were reviewed but not run against the Firestore emulator.
+`tests/checkin-model.test.mjs` covers scheduling, repeats, late marking, and attendance merging. `tests/import-names.test.mjs` covers CSV parsing and name-column detection. `tests/checkin.spec.mjs` runs a full organizer and attendee session in the browser: invite link, on-time and late check-ins with time stamps, walk-ins, marking present, replacing the code, changing the time, an event scheduled ahead, and importing people from `tests/fixtures/roster.xlsx` and `roster.csv`. The Firestore rules were reviewed but not run against the Firestore emulator.
 
 ## Deployment
 

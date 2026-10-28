@@ -18,6 +18,7 @@ import {
   randomId,
   validateEvent,
 } from "./model";
+import { ACCEPTED_FILES, MAX_ROSTER, newNamesOnly, readNamesFile } from "./importNames";
 import "./CheckIn.css";
 
 const NAME_KEY = "qrise.checkinName";
@@ -75,13 +76,24 @@ function useNow(intervalMs = 15000) {
   return now;
 }
 
+function connectionMessage(error) {
+  const code = error?.code ?? "";
+  if (code === "auth/configuration-not-found" || code === "auth/operation-not-allowed" || code === "auth/admin-restricted-operation") {
+    return "Check-in isn't set up yet: turn on Anonymous sign-in in the Firebase console (Authentication → Sign-in method → Anonymous).";
+  }
+  if (/not configured/i.test(error?.message ?? "")) {
+    return "Check-in isn't set up for this site: Firebase settings were not found. See the Check-in section of the README.";
+  }
+  return "Check-in couldn't connect to the QRise database. Check your connection and reload the page.";
+}
+
 function useBackend() {
   const [state, setState] = useState({ backend: null, error: "" });
   useEffect(() => {
     let active = true;
     getCheckinBackend().then(
       (backend) => { if (active) setState({ backend, error: "" }); },
-      () => { if (active) setState({ backend: null, error: "Check-in couldn't connect to the QRise database. Check your connection and reload the page." }); },
+      (error) => { if (active) setState({ backend: null, error: connectionMessage(error) }); },
     );
     return () => { active = false; };
   }, []);
@@ -417,12 +429,103 @@ function AttendanceLists({ backend, event, occurrence, isOwner }) {
   );
 }
 
+function ImportDialog({ analysis, fileName, existingNames, room, onImport, onClose }) {
+  const dialog = useRef(null);
+  const [columnId, setColumnId] = useState(analysis.suggested);
+  const [unchecked, setUnchecked] = useState(() => new Set());
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { dialog.current.showModal(); }, []);
+  const column = analysis.columns.find((c) => c.id === columnId);
+  const { fresh, duplicates } = newNamesOnly(column?.names ?? [], existingNames);
+  const chosen = fresh.filter((name) => !unchecked.has(name));
+  const tooMany = chosen.length > room;
+
+  function toggle(name) {
+    setUnchecked((previous) => {
+      const next = new Set(previous);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  }
+  async function submit(e) {
+    e.preventDefault();
+    setSaving(true);
+    await onImport(chosen);
+    setSaving(false);
+  }
+
+  return (
+    <dialog ref={dialog} className="ci-dialog" onCancel={onClose} aria-labelledby="import-title">
+      <form onSubmit={submit}>
+        <div className="ci-dialog-heading">
+          <h2 id="import-title">Import people</h2>
+          <button type="button" className="secondary" onClick={onClose}>Close</button>
+        </div>
+        <p className="ci-muted">From <strong>{fileName}</strong></p>
+        {analysis.columns.length > 1 && (
+          <label className="ci-field">Names are in
+            <select value={columnId} onChange={(e) => { setColumnId(e.target.value); setUnchecked(new Set()); }}>
+              {analysis.columns.map((c) => <option key={c.id} value={c.id}>{c.label} ({c.names.length})</option>)}
+            </select>
+          </label>
+        )}
+        <p className="ci-muted ci-import-summary" role="status">
+          {fresh.length} new {fresh.length === 1 ? "name" : "names"} found
+          {duplicates.length > 0 && ` · ${duplicates.length} already on the list will be skipped`}
+        </p>
+        {fresh.length > 0 && (
+          <>
+            <div className="ci-import-tools">
+              <button type="button" className="ci-link-button" onClick={() => setUnchecked(new Set())}>Select all</button>
+              <button type="button" className="ci-link-button" onClick={() => setUnchecked(new Set(fresh))}>Select none</button>
+            </div>
+            <ul className="ci-import-list">
+              {fresh.map((name) => (
+                <li key={name}>
+                  <label><input type="checkbox" checked={!unchecked.has(name)} onChange={() => toggle(name)} /> {name}</label>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {tooMany && <p role="alert" className="ci-error">An event can have up to {MAX_ROSTER} people on its list. Unselect {chosen.length - room} to continue.</p>}
+        <div className="ci-dialog-actions">
+          <button type="button" className="secondary" onClick={onClose}>Cancel</button>
+          <button type="submit" className="primary" disabled={!chosen.length || tooMany || saving}>
+            {saving ? "Adding…" : `Add ${chosen.length} ${chosen.length === 1 ? "person" : "people"}`}
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
 function RosterEditor({ backend, event }) {
   const [newName, setNewName] = useState("");
   const [error, setError] = useState("");
+  const [importing, setImporting] = useState(null);
+  const fileInput = useRef(null);
+  const { data: members } = useLive((ok, fail) => backend.subscribeMembers(event.id, ok, fail), `roster:${event.id}`, []);
+
+  async function chooseFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    try {
+      const analysis = await readNamesFile(file);
+      if (!analysis.columns.length) { setError(`No names were found in ${file.name}.`); return; }
+      setError("");
+      setImporting({ analysis, fileName: file.name });
+    } catch (err) { setError(err.message); }
+  }
+  async function importNames(names) {
+    const ok = await save([...event.roster, ...names.map((n) => ({ id: randomId(6), name: n }))]);
+    if (ok) setImporting(null);
+  }
   async function save(roster) {
-    try { await backend.updateEvent(event.id, { ...event, roster }); setError(""); }
-    catch (e) { setError(errorMessage(e)); }
+    if (roster.length > MAX_ROSTER) { setError(`An event can have up to ${MAX_ROSTER} people on its list.`); return false; }
+    try { await backend.updateEvent(event.id, { ...event, roster }); setError(""); return true; }
+    catch (e) { setError(errorMessage(e)); return false; }
   }
   async function add(e) {
     e.preventDefault();
@@ -439,6 +542,11 @@ function RosterEditor({ backend, event }) {
         <input id="roster-name" value={newName} onChange={(e) => setNewName(e.target.value)} placeholder="Add names, separated by commas" maxLength={600} />
         <button type="submit" className="secondary">Add</button>
       </form>
+      <div className="ci-import-row">
+        <button type="button" className="secondary" onClick={() => fileInput.current.click()}>Import from file</button>
+        <span className="ci-muted ci-small">Spreadsheet (.xlsx, .csv) or text file. Names are found automatically.</span>
+        <input ref={fileInput} type="file" accept={ACCEPTED_FILES} hidden aria-label="Import a list of names" onChange={chooseFile} />
+      </div>
       {error && <p role="alert" className="ci-error">{error}</p>}
       {event.roster.length > 0 && (
         <ul className="ci-people ci-roster">
@@ -452,6 +560,16 @@ function RosterEditor({ backend, event }) {
         </ul>
       )}
       <p className="ci-muted ci-small">People who scan the code without being on this list are added automatically.</p>
+      {importing && (
+        <ImportDialog
+          analysis={importing.analysis}
+          fileName={importing.fileName}
+          existingNames={[...event.roster.map((p) => p.name), ...members.map((m) => m.name)]}
+          room={MAX_ROSTER - event.roster.length}
+          onImport={importNames}
+          onClose={() => setImporting(null)}
+        />
+      )}
     </section>
   );
 }

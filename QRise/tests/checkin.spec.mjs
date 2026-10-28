@@ -125,3 +125,34 @@ test("check-in waits until the window opens for events scheduled ahead", async (
   await expect(guest.getByText(/Check-in opens Thu, Nov 5 at 5:30 PM/)).toBeVisible();
   await expect(guest.getByRole("button", { name: "Check in now" })).toHaveCount(0);
 });
+
+test("organizers import expected people from a spreadsheet or CSV, with names detected automatically", async ({ page }) => {
+  await page.goto(APP);
+  await page.getByRole("button", { name: "Check-in", exact: true }).first().click();
+  await page.getByRole("button", { name: "New event" }).click();
+  const editor = page.getByRole("dialog", { name: "New event" });
+  await editor.getByLabel("Event name").fill("Lab section");
+  await editor.getByLabel("Date").fill("2026-10-28");
+  await editor.getByLabel("Start time").fill("09:00");
+  await editor.getByRole("button", { name: "Create event" }).click();
+  await expect(page.getByRole("heading", { name: "Lab section" })).toBeVisible();
+
+  await page.getByLabel("Import a list of names").setInputFiles(new URL("./fixtures/roster.xlsx", import.meta.url).pathname);
+  const dialog = page.getByRole("dialog", { name: "Import people" });
+  await expect(dialog.getByLabel("Names are in")).toHaveValue("1+2");
+  await expect(dialog.getByRole("status")).toHaveText("4 new names found");
+  await dialog.getByLabel("Dev Patel").uncheck();
+  await dialog.getByRole("button", { name: "Add 3 people" }).click();
+  await expect(dialog).toHaveCount(0);
+
+  await page.getByLabel("Import a list of names").setInputFiles(new URL("./fixtures/roster.csv", import.meta.url).pathname);
+  await expect(dialog.getByRole("status")).toHaveText("2 new names found · 1 already on the list will be skipped");
+  await expect(dialog.getByRole("listitem")).toHaveText(["Eli Moreno", "Fay Chen"]);
+  await dialog.getByRole("button", { name: "Add 2 people" }).click();
+
+  const absent = page.getByRole("region", { name: /Absent/ });
+  await expect(absent.getByRole("listitem")).toHaveText([/Ana Lee/, /Ben Ortiz/, /Cara Wu/, /Eli Moreno/, /Fay Chen/]);
+
+  await page.getByLabel("Import a list of names").setInputFiles({ name: "old.xls", mimeType: "application/vnd.ms-excel", buffer: Buffer.from("x") });
+  await expect(page.getByRole("alert")).toContainText("Old .xls files aren't supported");
+});
