@@ -1,0 +1,67 @@
+rules_version = '2';
+
+// QRise check-in. Every device signs in anonymously; people only type a display name.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function eventData(eventId) { return get(/databases/$(database)/documents/events/$(eventId)).data; }
+    function isOwner(eventId) { return signedIn() && eventData(eventId).ownerId == request.auth.uid; }
+    function validName(name) { return name is string && name.size() > 0 && name.size() <= 60; }
+    function validEvent(data) {
+      return validName(data.title)
+        && data.date is string && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.time is string && data.time.matches('^([01][0-9]|2[0-3]):[0-5][0-9]$')
+        && data.durationMinutes is int && data.durationMinutes >= 5 && data.durationMinutes <= 1440
+        && data.opensMinutesBefore is int && data.opensMinutesBefore >= 0 && data.opensMinutesBefore <= 1440
+        && data.lateAfterMinutes is int && data.lateAfterMinutes >= 0
+        && data.repeatDays is list && data.repeatDays.size() <= 7
+        && data.roster is list && data.roster.size() <= 500;
+    }
+
+    match /events/{eventId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && validEvent(request.resource.data);
+      allow update: if signedIn()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+        && validEvent(request.resource.data);
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+
+      // The secret printed in the event QR code. Only the organizer can read it, so
+      // attendees need the physical code (or its link) to check in.
+      match /secrets/{secretId} {
+        allow read, write: if isOwner(eventId);
+      }
+
+      match /members/{uid} {
+        allow read: if signedIn();
+        allow create, update: if signedIn()
+          && uid == request.auth.uid
+          && request.resource.data.uid == uid
+          && validName(request.resource.data.name)
+          && request.resource.data.source in ['invite', 'checkin'];
+        allow delete: if signedIn() && (uid == request.auth.uid || isOwner(eventId));
+      }
+
+      match /checkins/{checkinId} {
+        allow read: if signedIn();
+        // Attendees: one check-in per occurrence, server time stamp, matching secret code.
+        allow create: if signedIn()
+          && request.resource.data.uid == request.auth.uid
+          && checkinId == request.resource.data.occurrence + '_' + request.auth.uid
+          && validName(request.resource.data.name)
+          && request.resource.data.checkedInAt == request.time
+          && request.resource.data.code == get(/databases/$(database)/documents/events/$(eventId)/secrets/checkin).data.codeId;
+        // Organizer: mark someone present by hand.
+        allow create: if isOwner(eventId)
+          && request.resource.data.manual == true
+          && request.resource.data.uid == null
+          && validName(request.resource.data.name)
+          && request.resource.data.checkedInAt == request.time;
+        allow delete: if isOwner(eventId);
+      }
+    }
+  }
+}

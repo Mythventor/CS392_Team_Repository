@@ -88,6 +88,8 @@
 .qr-setup-copy { max-width: 480px; }
 .qr-setup-copy h2 { margin-top: 14px; color: #56351f; font-size: 23px; letter-spacing: -.035em; }
 .qr-setup-copy > p { margin: 10px 0 20px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.qr-setup-copy > .qr-alarm-time { margin: 4px 0 0; color: var(--subtle); font-size: 14px; line-height: 1.5; }
+.qr-alarm-time > span { color: #56351f; font-weight: 700; font-variant-numeric: tabular-nums; }
 .status-pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border-radius: 99px; background: #f8efdf; color: #805d32; font-size: 11px; font-weight: 700; }
 .status-pill > span { width: 6px; height: 6px; border-radius: 50%; background: #c08b3e; }
 .qr-setup-copy .secondary { padding: 10px 14px; border: 1px solid var(--border); border-radius: 8px; background: var(--page); color: var(--subtle); font-size: 13px; }

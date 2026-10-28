@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import QRCode from "qrcode";
 import AlarmManagement from "./alarms/AlarmManagement";
-import { displayTime } from "./alarms/model";
+import { displayTime, repeatLabel } from "./alarms/model";
 import { nextOccurrence } from "./alarm-system/scheduler";
 import AlarmSystem from "./alarm-system/AlarmSystem";
 import { readAlarms, readQrCodes, writeAlarms, writeQrCodes } from "./storage";
 import { createQrPayload, findMatchingQrCode } from "./qr/model";
+import CheckInPage, { CheckInHomeCard } from "./checkin/CheckIn";
+import { readRoute } from "./checkin/model";
 import "./App.css";
 
 function getInitialAlarms() {
@@ -22,6 +24,7 @@ function getInitialAlarms() {
 function Navigation({ page, onNavigate }) {
   const items = [
     { id: "home", label: "Home", icon: "⌂" },
+    { id: "checkin", label: "Check-in", icon: "✓" },
     { id: "alarms", label: "Alarms", icon: "◷" },
     { id: "qr", label: "QR code", icon: "▦" },
   ];
@@ -84,7 +87,7 @@ function QrCodeImage({ qrCode, alarmLabel }) {
     : <p role="status">Preparing QR code…</p>;
 }
 
-function HomeDashboard({ alarms }) {
+function HomeDashboard({ alarms, onOpenCheckIn }) {
   const nextAlarm = useMemo(() => {
     const now = new Date();
     return alarms
@@ -101,7 +104,7 @@ function HomeDashboard({ alarms }) {
         <div className="welcome-copy">
           <p className="eyebrow">A better morning starts tonight</p>
           <h1 id="welcome-title">Rise with intention.</h1>
-          <p>Pair alarms with printed QR codes, then get moving to scan one when it is time to rise.</p>
+          <p>Pair alarms with printed QR codes, then get moving to scan one when it is time to rise. Now with QR check-in for classes, clubs, and events.</p>
         </div>
         <div className="welcome-art" aria-hidden="true">
           <span className="sun-orbit" />
@@ -110,6 +113,7 @@ function HomeDashboard({ alarms }) {
           <span className="horizon horizon-front" />
         </div>
       </div>
+      <CheckInHomeCard onOpen={onOpenCheckIn} />
       <div className="overview-grid">
         <article className="overview-card next-alarm-card">
           <div className="overview-icon" aria-hidden="true">◷</div>
@@ -176,6 +180,10 @@ function QrSetup({ alarms, qrCodes, onCreate, onPrint, printingCode }) {
                     <span />{qrCode ? "Ready to print" : "Not set up"}
                   </span>
                   <h2>{alarm.label}</h2>
+                  <p className="qr-alarm-time">
+                    <span>{displayTime(alarm.time).clock} {displayTime(alarm.time).period}</span>
+                    {" · "}{repeatLabel(alarm.days)}{alarm.enabled ? "" : " · Off"}
+                  </p>
                   <p>
                     {qrCode
                       ? "This unique code is paired with this alarm. Scan it while this alarm is ringing to turn it off."
@@ -208,7 +216,20 @@ export default function App() {
   const [storageError, setStorageError] = useState(initial.error);
   const [qrStorageError, setQrStorageError] = useState(initialQr.error);
   const [printingCode, setPrintingCode] = useState("");
-  const [page, setPage] = useState("home");
+  const [checkinRoute, setCheckinRoute] = useState(() => readRoute(window.location.search));
+  const [page, setPage] = useState(() => (checkinRoute ? "checkin" : "home"));
+
+  const navigate = useCallback((nextPage) => {
+    setPage(nextPage);
+    if (nextPage !== "checkin") setCheckinRoute(null);
+    if (window.location.search) window.history.replaceState(null, "", window.location.pathname);
+  }, []);
+
+  const changeCheckinRoute = useCallback((route) => {
+    setCheckinRoute(route);
+    if (window.location.search) window.history.replaceState(null, "", window.location.pathname);
+    window.scrollTo(0, 0);
+  }, []);
 
   const updateAlarms = useCallback((nextAlarms) => {
     setAlarms(nextAlarms);
@@ -264,17 +285,19 @@ export default function App() {
   return (
     <div className="app-shell">
       <header className="app-header">
-        <a className="brand" href="#home" onClick={(event) => { event.preventDefault(); setPage("home"); }}>
+        <a className="brand" href="#home" onClick={(event) => { event.preventDefault(); navigate("home"); }}>
           <span className="brand-mark" aria-hidden="true"><span /></span>
           <span>QRise</span>
         </a>
-        <Navigation page={page} onNavigate={setPage} />
+        <Navigation page={page} onNavigate={(next) => { navigate(next); if (next === "checkin") setCheckinRoute(null); }} />
         <span className="header-caption">Your morning, reimagined</span>
       </header>
-      <main className="app-main">
+      <main className="app-main" data-page={page}>
         {storageError && <p className="storage-alert" role="alert">{storageError}</p>}
         {qrStorageError && <p className="storage-alert" role="alert">{qrStorageError}</p>}
-        {page === "qr" ? (
+        {page === "checkin" ? (
+          <CheckInPage route={checkinRoute} onRouteChange={changeCheckinRoute} />
+        ) : page === "qr" ? (
           <QrSetup
             alarms={alarms}
             qrCodes={qrCodes}
@@ -284,7 +307,7 @@ export default function App() {
           />
         ) : (
           <>
-            {page === "home" && <HomeDashboard alarms={alarms} />}
+            {page === "home" && <HomeDashboard alarms={alarms} onOpenCheckIn={() => navigate("checkin")} />}
             <AlarmManagement alarms={alarms} onChange={updateAlarms} />
           </>
         )}

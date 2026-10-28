@@ -152,6 +152,69 @@ The Playwright suite (`npm run test:e2e`) covers the complete workflow:
 
 Unit tests (`npm test`) cover storage save/restore and validation, the alarm model, the scheduler, QR matching, and the failsafe window.
 
+## Check-in (major feature)
+
+QRise also takes attendance. An organizer creates an event, shows or prints its QR code, and people scan it with their phone camera to check in. Each check-in gets a time stamp from the server.
+
+**Organizers** (Check-in tab → New event):
+
+- Set the name, location, date, start time, length, and optional repeat days. Pick a future date to schedule ahead.
+- Choose when check-in opens (default 30 minutes before) and when arrivals count as late (default 10 minutes after the start).
+- Edit the time or repeat days at any time; past check-ins stay attached to the dates they happened on.
+- Add expected people by name, or share the **invite link** so people can join the list themselves.
+- Watch the **Here** list (name, time stamp, On time / Late) and the **Absent** list update live. People who scan in without being on the list are added automatically and tagged "Added at check-in".
+- Mark someone present by hand or undo a check-in, and look back at past dates or ahead to upcoming ones.
+- **Replace code** invalidates the printed QR code, for example if a photo of it was shared.
+
+**Attendees** scan the code with their camera app (it opens a check-in link) or with **Scan event code** inside QRise, type their name once, and tap **Check in now**. Check-in only works while the event's window is open, and each person can check in once per date.
+
+### How it works
+
+- `src/checkin/model.js`: scheduling (one-time and repeating dates, check-in windows, late cutoff), attendance lists, and links.
+- `src/checkin/CheckIn.jsx`: the Check-in tab, event editor, organizer view, attendee check-in page, and invite page.
+- `src/checkin/firestoreBackend.js`: stores events in Cloud Firestore. Each device signs in with Firebase Anonymous Authentication, so nobody creates an account, but the database still knows who owns each event.
+- `firestore.rules`: only the organizer can edit an event, see its secret code, mark people present, or delete check-ins. A check-in is accepted only if it carries the event's current secret code, uses the attendee's own ID, and is stamped with the server's time.
+- `src/checkin/memoryBackend.js`: a browser-only copy of the database, with the same permission rules, used by the automated tests.
+
+The QR code contains a link like `https://qrise-cs392.web.app/?checkin=<event>&code=<secret>`. The invite link (`?event=<event>`) shows the event and lets people join the list, but cannot check anyone in.
+
+### Firebase setup (one time)
+
+In the [Firebase console](https://console.firebase.google.com/) for project `cs392-react-challenge-692dd`:
+
+1. **Build → Firestore Database → Create database** (production mode, any nearby location).
+2. **Build → Authentication → Get started → Sign-in method → Anonymous → Enable.**
+3. **Project settings → Your apps:** make sure a Web app exists. If not, add one (no hosting setup needed).
+
+Then, from `QRise/`:
+
+```sh
+npm install
+firebase deploy --only firestore:rules
+npm run build
+firebase deploy --only hosting
+```
+
+The deployed site reads its Firebase settings automatically from Firebase Hosting. For local development (`npm run dev`), create `QRise/.env.local` with the values from **Project settings → Your apps → SDK setup and configuration**:
+
+```sh
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=cs392-react-challenge-692dd.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=cs392-react-challenge-692dd
+VITE_FIREBASE_APP_ID=...
+```
+
+### Limitations
+
+- Names are typed, not verified, so someone could type another person's name. The secret code still means they had to be able to scan it.
+- Ownership is tied to the browser's anonymous Firebase account. Clearing site data or switching devices loses organizer access to existing events.
+- Dates and times use each device's local timezone, so everyone should be in the same timezone as the organizer.
+- Check-in windows are enforced by the app, not by the database rules.
+
+### Tests
+
+`tests/checkin-model.test.mjs` covers scheduling, repeats, late marking, and attendance merging. `tests/checkin.spec.mjs` runs a full organizer and attendee session in the browser: invite link, on-time and late check-ins with time stamps, walk-ins, marking present, replacing the code, changing the time, and an event scheduled ahead. The Firestore rules were reviewed but not run against the Firestore emulator.
+
 ## Deployment
 
 QRise is deployed with Firebase Hosting as its own site, **qrise-cs392**, inside the team's Firebase project (`cs392-react-challenge-692dd`), so it has a separate URL from the other CS 392 React app. `firebase.json` serves the Vite build output (`dist/`) to that site and sends every path to `index.html`.
