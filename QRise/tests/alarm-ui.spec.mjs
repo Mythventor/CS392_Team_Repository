@@ -50,7 +50,8 @@ test('home navigation, local alarm persistence, and printable QR pairing work to
   expect(savedCodes).toHaveLength(1);
   expect(savedCodes[0].alarmId).toBeTruthy();
   await page.reload();
-  await page.getByRole('button', { name: 'QR code' }).click();
+  // Refreshing stays on the QR code page.
+  await expect(page.getByRole('heading', { name: 'Your QR code' })).toBeVisible();
   await expect(page.getByRole('img', { name: 'QR code paired with Persisted alarm' })).toBeVisible();
   await page.getByRole('button', { name: 'Home' }).click();
   await expect(page.getByRole('heading', { name: 'Rise with intention.' })).toBeVisible();

@@ -83,3 +83,20 @@ test("event validation catches missing names and impossible timings", () => {
   assert.equal(validateEvent({ ...base, lateAfterMinutes: 90 }).length, 1);
   assert.equal(validateEvent({ ...base, durationMinutes: 2, lateAfterMinutes: 0 }).length, 1);
 });
+
+test("the address bar records the current page and event so a refresh reopens it", async () => {
+  const { readLocation, locationSearch } = await import("../src/checkin/model.js");
+  for (const location of [
+    { page: "home", route: null },
+    { page: "checkin", route: null },
+    { page: "alarms", route: null },
+    { page: "qr", route: null },
+    { page: "checkin", route: { view: "manage", eventId: "evt123abc" } },
+    { page: "checkin", route: { view: "invite", eventId: "evt123abc" } },
+    { page: "checkin", route: { view: "checkin", eventId: "evt123abc", code: "code456def789" } },
+  ]) {
+    assert.deepEqual(readLocation(locationSearch(location)), location);
+  }
+  assert.deepEqual(readLocation("?page=nope"), { page: "home", route: null });
+  assert.deepEqual(readLocation("?manage=<bad>"), { page: "home", route: null });
+});

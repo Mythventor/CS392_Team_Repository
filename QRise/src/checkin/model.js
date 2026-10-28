@@ -189,6 +189,26 @@ export function readRoute(search) {
   return null;
 }
 
+const PAGES = ["home", "checkin", "alarms", "qr"];
+
+// The app's location in the address bar, so refreshing or using Back keeps you in place.
+export function readLocation(search) {
+  const route = readRoute(search);
+  if (route) return { page: "checkin", route };
+  const params = new URLSearchParams(search);
+  const manage = params.get("manage");
+  if (manage && ID_PATTERN.test(manage)) return { page: "checkin", route: { view: "manage", eventId: manage } };
+  const page = params.get("page");
+  return { page: PAGES.includes(page) ? page : "home", route: null };
+}
+
+export function locationSearch({ page, route }) {
+  if (page === "checkin" && route?.view === "manage") return `?${new URLSearchParams({ manage: route.eventId })}`;
+  if (page === "checkin" && route?.view === "checkin") return `?${new URLSearchParams({ checkin: route.eventId, code: route.code })}`;
+  if (page === "checkin" && route?.view === "invite") return `?${new URLSearchParams({ event: route.eventId })}`;
+  return page === "home" ? "" : `?${new URLSearchParams({ page })}`;
+}
+
 export function randomId(bytes = 16) {
   const values = crypto.getRandomValues(new Uint8Array(bytes));
   return Array.from(values, (v) => v.toString(16).padStart(2, "0")).join("");

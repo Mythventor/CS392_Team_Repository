@@ -104,6 +104,15 @@ test("organizer runs attendance: invite, scan-in with time stamps, walk-ins, lat
   await expect(organizer.getByText(/Check-in opens Mon, Nov 2/)).toBeVisible();
   await expect(organizer.getByRole("region", { name: /Expected/ }).getByRole("listitem")).toHaveCount(5);
 
+  // Refreshing keeps the organizer on the event page; Back returns to where they were.
+  await organizer.reload();
+  await expect(organizer.getByRole("heading", { name: "CS392 lecture" })).toBeVisible();
+  await expect(organizer).toHaveURL(/\?manage=/);
+  await organizer.goBack();
+  await expect(organizer.getByRole("heading", { name: "Check-in", exact: true })).toBeVisible();
+  await organizer.goForward();
+  await expect(organizer.getByRole("heading", { name: "CS392 lecture" })).toBeVisible();
+
   // The event list shows the organizer's events.
   await organizer.getByRole("button", { name: "← All events" }).click();
   await expect(organizer.getByRole("region", { name: "Events you organize" })).toContainText("CS392 lecture");

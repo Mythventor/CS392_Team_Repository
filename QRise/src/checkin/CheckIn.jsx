@@ -796,7 +796,7 @@ export default function CheckInPage({ route, onRouteChange }) {
           onOpenJoined={(id) => go({ view: "manage", eventId: id })}
           onScan={() => setScanning(true)} />
       )}
-      {backend && view.view === "manage" && <EventManager backend={backend} eventId={view.eventId} onBack={() => go(null)} />}
+      {backend && view.view === "manage" && <EventManager key={view.eventId} backend={backend} eventId={view.eventId} onBack={() => go(null)} />}
       {backend && view.view === "checkin" && <AttendeeCheckIn backend={backend} eventId={view.eventId} code={view.code} name={name} setName={setName} onDone={() => go(null)} />}
       {backend && view.view === "invite" && <InviteView backend={backend} eventId={view.eventId} name={name} setName={setName} onDone={() => go(null)} />}
       {scanning && <ScanDialog onClose={() => setScanning(false)} onResult={(link) => { setScanning(false); go({ view: "checkin", ...link }); }} />}

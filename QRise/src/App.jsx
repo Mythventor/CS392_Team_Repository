@@ -7,7 +7,7 @@ import AlarmSystem from "./alarm-system/AlarmSystem";
 import { readAlarms, readQrCodes, writeAlarms, writeQrCodes } from "./storage";
 import { createQrPayload, findMatchingQrCode } from "./qr/model";
 import CheckInPage, { CheckInHomeCard } from "./checkin/CheckIn";
-import { readRoute } from "./checkin/model";
+import { locationSearch, readLocation } from "./checkin/model";
 import "./App.css";
 
 function getInitialAlarms() {
@@ -216,20 +216,28 @@ export default function App() {
   const [storageError, setStorageError] = useState(initial.error);
   const [qrStorageError, setQrStorageError] = useState(initialQr.error);
   const [printingCode, setPrintingCode] = useState("");
-  const [checkinRoute, setCheckinRoute] = useState(() => readRoute(window.location.search));
-  const [page, setPage] = useState(() => (checkinRoute ? "checkin" : "home"));
+  // Where the user is (page + check-in view) lives in the address bar, so a refresh
+  // reopens the same screen and the browser's Back button works.
+  const [location, setLocation] = useState(() => readLocation(window.location.search));
+  const { page, route: checkinRoute } = location;
 
-  const navigate = useCallback((nextPage) => {
-    setPage(nextPage);
-    if (nextPage !== "checkin") setCheckinRoute(null);
-    if (window.location.search) window.history.replaceState(null, "", window.location.pathname);
-  }, []);
-
-  const changeCheckinRoute = useCallback((route) => {
-    setCheckinRoute(route);
-    if (window.location.search) window.history.replaceState(null, "", window.location.pathname);
+  const go = useCallback((next) => {
+    setLocation(next);
+    const search = locationSearch(next);
+    if (search !== window.location.search) {
+      window.history.pushState(null, "", `${window.location.pathname}${search}`);
+    }
     window.scrollTo(0, 0);
   }, []);
+
+  useEffect(() => {
+    const restore = () => setLocation(readLocation(window.location.search));
+    window.addEventListener("popstate", restore);
+    return () => window.removeEventListener("popstate", restore);
+  }, []);
+
+  const navigate = useCallback((nextPage) => go({ page: nextPage, route: null }), [go]);
+  const changeCheckinRoute = useCallback((route) => go({ page: "checkin", route }), [go]);
 
   const updateAlarms = useCallback((nextAlarms) => {
     setAlarms(nextAlarms);
@@ -289,7 +297,7 @@ export default function App() {
           <span className="brand-mark" aria-hidden="true"><span /></span>
           <span>QRise</span>
         </a>
-        <Navigation page={page} onNavigate={(next) => { navigate(next); if (next === "checkin") setCheckinRoute(null); }} />
+        <Navigation page={page} onNavigate={navigate} />
         <span className="header-caption">Your morning, reimagined</span>
       </header>
       <main className="app-main" data-page={page}>
