@@ -129,6 +129,12 @@ Person 4 provides the app shell and connects the alarm settings, alarm system, a
 - If a QR code image cannot be generated, the card shows an error instead of a broken image.
 - Camera errors during verification can be retried without stopping the alarm.
 
+### Alarm notifications
+
+The alarm panel has an **Enable notifications** button. Once the user allows notifications, QRise registers a small service worker (`public/sw.js`) and shows a system notification ("⏰ <alarm label>") whenever an alarm starts ringing, in addition to the sound and ringing dialog. The notification stays until it is tapped or the alarm is dismissed; tapping it brings QRise back to the front so the user can scan their QR code. Notification logic lives in `src/alarm-system/notifications.js`. If notifications are blocked or unsupported, the app says so and the alarm still rings normally. On iPhone, notifications require adding QRise to the Home Screen first.
+
+Notifications come from the open web page, so they help when QRise is in a background tab or behind another app, but not when the browser is closed or the phone is asleep. Waking a locked phone would require server-sent push notifications or a native app.
+
 ### Known limitations
 
 Scheduler and ringing state are in memory. A page refresh restores saved alarms and pairings but clears any currently ringing alarm, so it cannot be dismissed after a refresh. Clock and timezone changes are picked up on the scheduler's next check (every 500 ms and on focus/visibility changes) rather than handled as a separate event. Reliable locked-phone wake-up requires a native app.
