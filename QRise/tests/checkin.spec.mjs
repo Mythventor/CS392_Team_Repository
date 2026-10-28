@@ -62,6 +62,10 @@ test("organizer runs attendance: invite, scan-in with time stamps, walk-ins, lat
   await expect(ana.getByText("You're checked in")).toBeVisible();
   await expect(ana.getByText(/Recorded at 8:50:00\s?AM · On time/)).toBeVisible();
   await expect(here.getByRole("listitem").filter({ hasText: "ana lee" })).toContainText("On time");
+  // The organizer's page updates on its own and announces the arrival.
+  await expect(here.getByText("Live")).toBeVisible();
+  await expect(organizer.getByText("ana lee just checked in · 8:50 AM")).toBeVisible();
+  await expect(here.locator("li.ci-new")).toContainText("ana lee");
   await ana.reload();
   await expect(ana.getByText("You're checked in")).toBeVisible();
 

@@ -376,11 +376,38 @@ function OccurrencePicker({ event, now, value, onChange }) {
   );
 }
 
+// Notices people who arrive while the page is open (not the ones already there on load).
+function useArrivals(present, listKey, loading) {
+  const [state, setState] = useState({ key: null, seen: new Set(), recent: [] });
+  if (!loading && state.key !== listKey) {
+    setState({ key: listKey, seen: new Set(present.map((p) => p.id)), recent: [] });
+  } else if (!loading) {
+    const arrived = present.filter((p) => !state.seen.has(p.id));
+    if (arrived.length) {
+      setState({
+        key: listKey,
+        seen: new Set([...state.seen, ...arrived.map((p) => p.id)]),
+        recent: [...arrived.map((p) => ({ id: p.id, name: p.name, at: p.checkedInAt, manual: p.manual })), ...state.recent].slice(0, 3),
+      });
+    }
+  }
+  const newest = state.recent[0]?.id;
+  useEffect(() => {
+    if (!newest) return undefined;
+    const timer = setTimeout(() => setState((s) => ({ ...s, recent: [] })), 6000);
+    return () => clearTimeout(timer);
+  }, [newest]);
+  return state.key === listKey ? state.recent : [];
+}
+
 function AttendanceLists({ backend, event, occurrence, isOwner }) {
   const { data: members } = useLive((ok, fail) => backend.subscribeMembers(event.id, ok, fail), event.id, []);
-  const { data: checkins, error } = useLive(
-    (ok, fail) => backend.subscribeCheckins(event.id, occurrence.key, ok, fail), `${event.id}:${occurrence.key}`, []);
+  const listKey = `${event.id}:${occurrence.key}`;
+  const { data: checkins, error, loading } = useLive(
+    (ok, fail) => backend.subscribeCheckins(event.id, occurrence.key, ok, fail), listKey, []);
   const { present, absent } = attendance({ event, members, checkins, occurrence });
+  const arrivals = useArrivals(present, listKey, loading);
+  const recentIds = new Set(arrivals.map((a) => a.id));
   const [actionError, setActionError] = useState("");
   const run = (fn) => fn().then(() => setActionError(""), (e) => setActionError(errorMessage(e)));
   const showAbsent = occurrence.status !== "upcoming";
@@ -388,12 +415,21 @@ function AttendanceLists({ backend, event, occurrence, isOwner }) {
   return (
     <div className="ci-attendance">
       {(error || actionError) && <p role="alert" className="ci-error">{actionError || errorMessage(error)}</p>}
+      <div className="ci-toasts" role="status" aria-live="polite">
+        {arrivals.map((a) => (
+          <p key={a.id} className="ci-toast">
+            <span aria-hidden="true">✓</span> {a.name} {a.manual ? "marked present" : "just checked in"} · {formatTime(a.at)}
+          </p>
+        ))}
+      </div>
       <section aria-labelledby="present-title" className="ci-list-card">
-        <h3 id="present-title">Here <span className="ci-count">{present.length}</span></h3>
+        <h3 id="present-title">Here <span className="ci-count">{present.length}</span>
+          {!error && <span className="ci-live" title="New check-ins appear automatically"><span aria-hidden="true" />Live</span>}
+        </h3>
         {present.length ? (
           <ul className="ci-people">
             {present.map((person) => (
-              <li key={person.id}>
+              <li key={person.id} className={recentIds.has(person.id) ? "ci-new" : undefined}>
                 <span className="ci-person-name">{person.name}</span>
                 <span className="ci-person-meta">
                   <time dateTime={person.checkedInAt.toISOString()}>{formatStamp(person.checkedInAt)}</time>
