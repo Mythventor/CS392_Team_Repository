@@ -13,18 +13,20 @@ npm run dev:emulator
 
 Open http://localhost:5173. Sign-in shows the emulator's test account screen instead of Google, where you can add a fake account.
 
-## Connect a real Firebase project
+## Use the team's Firebase project
 
-1. In the [Firebase console](https://console.firebase.google.com), create a project and register a web app.
-2. Turn on **Authentication > Sign-in method > Google**, and create a **Firestore** database.
-3. Copy `.env.example` to `.env.local` and fill in the web app's config.
-4. Deploy the security rules:
+The project is `borrowbuddy-cs392`. Ask its owner to add you under **Project settings > Users and permissions** in the [Firebase console](https://console.firebase.google.com/project/borrowbuddy-cs392/overview), then:
+
+1. Print the web app's config:
    ```sh
-   firebase deploy --only firestore:rules --project YOUR_PROJECT_ID
+   firebase apps:sdkconfig web --project borrowbuddy-cs392
    ```
-5. Run `npm run dev`.
+2. Copy `.env.example` to `.env.local` and fill in those values.
+3. Run `npm run dev`.
 
-To host the site, run `npm run build`, then `firebase deploy --only hosting --project YOUR_PROJECT_ID`, and make sure the site's domain is listed under **Authentication > Settings > Authorized domains**.
+After changing `firestore.rules`, deploy them with `firebase deploy --only firestore:rules`.
+
+To host the site, run `npm run build`, then `firebase deploy --only hosting`. If you use another domain, add it under **Authentication > Settings > Authorized domains**.
 
 ## Scripts
 
