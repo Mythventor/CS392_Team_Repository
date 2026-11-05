@@ -19,7 +19,16 @@ service cloud.firestore {
       return data.title is string && data.title.size() > 0 && data.title.size() <= 80
         && textUpTo(data.category, 40)
         && textUpTo(data.school, 40)
-        && data.status in ['available', 'unavailable'];
+        && data.status in ['available', 'unavailable']
+        && (!('description' in data) || textUpTo(data.description, 2000))
+        && (!('pickupArea' in data) || textUpTo(data.pickupArea, 120))
+        && (!('condition' in data) || data.condition in ['Like new', 'Good', 'Fair'])
+        && (!('photoURL' in data) || textUpTo(data.photoURL, 2048))
+        && (!('photoPath' in data) || data.photoPath == '' || data.photoPath.matches('items/' + request.auth.uid + '/.*'))
+        && (!('availableFrom' in data) || data.availableFrom.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'))
+        && (!('availableTo' in data) || data.availableTo.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'))
+        && (!('availableFrom' in data) || !('availableTo' in data) || data.availableFrom <= data.availableTo)
+        && (!('archived' in data) || (data.archived is bool && (!data.archived || data.status == 'unavailable')));
     }
 
     // Profiles are visible to signed-in students. Only the owner can change theirs.
@@ -40,6 +49,7 @@ service cloud.firestore {
       allow update: if signedIn()
         && resource.data.ownerId == request.auth.uid
         && request.resource.data.ownerId == resource.data.ownerId
+        && (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt)
         && validItem(request.resource.data);
       allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
     }

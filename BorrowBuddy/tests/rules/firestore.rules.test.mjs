@@ -81,3 +81,12 @@ test("other collections stay closed by default", async () => {
   await assertFails(setDoc(doc(as("sam"), "secrets/x"), { a: 1 }));
   await assertFails(getDoc(doc(as("sam"), "secrets/x")));
 });
+
+test('listing dates, condition, photo ownership and archive status are validated', async () => {
+  const ref = doc(as('sam'), 'items/validation');
+  await assertFails(setDoc(ref, { ...item, availableFrom: '2099-02-01', availableTo: '2099-01-01' }));
+  await assertFails(setDoc(ref, { ...item, condition: 'invalid' }));
+  await assertFails(setDoc(ref, { ...item, photoPath: 'items/alex/x/photo' }));
+  await assertFails(setDoc(ref, { ...item, archived: true }));
+  await assertSucceeds(setDoc(ref, { ...item, archived: true, status: 'unavailable' }));
+});

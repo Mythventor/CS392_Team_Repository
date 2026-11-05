@@ -56,6 +56,7 @@ export function Layout() {
           <nav className="desktop-nav" aria-label="Main">
             <NavLink to="/browse" className="nav-link">Browse</NavLink>
             <NavLink to="/list" className="nav-link">List an item</NavLink>
+            {user && <NavLink to="/my-listings" className="nav-link">My listings</NavLink>}
           </nav>
           <AccountLink />
         </div>

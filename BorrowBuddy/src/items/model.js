@@ -39,7 +39,7 @@ export function localDateString(date = new Date()) {
 }
 
 export function isAvailable(item, today = localDateString()) {
-  if (item.status !== "available") return false;
+  if (item.archived || item.status !== "available") return false;
   return !item.availableTo || item.availableTo >= today;
 }
 

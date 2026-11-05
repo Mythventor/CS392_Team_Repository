@@ -3,12 +3,15 @@ import { initializeApp } from "firebase/app";
 import { connectAuthEmulator, getAuth } from "firebase/auth";
 import { connectFirestoreEmulator, getFirestore } from "firebase/firestore";
 
+import { connectStorageEmulator, getStorage } from "firebase/storage";
+
 const env = import.meta.env;
 
 export const isFirebaseConfigured = Boolean(env.VITE_FIREBASE_API_KEY && env.VITE_FIREBASE_PROJECT_ID);
 
 let auth = null;
 let db = null;
+let storage = null;
 
 if (isFirebaseConfigured) {
   const app = initializeApp({
@@ -21,11 +24,13 @@ if (isFirebaseConfigured) {
   });
   auth = getAuth(app);
   db = getFirestore(app);
+  storage = getStorage(app);
 
   if (env.VITE_USE_EMULATORS === "true") {
     connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
     connectFirestoreEmulator(db, "127.0.0.1", 8080);
+    connectStorageEmulator(storage, "127.0.0.1", 9199);
   }
 }
 
-export { auth, db };
+export { auth, db, storage };

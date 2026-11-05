@@ -3,7 +3,7 @@ import { AuthProvider } from "./auth/AuthProvider";
 import { Layout } from "./components/Layout";
 import { isFirebaseConfigured } from "./lib/firebase";
 import { BrowsePage } from "./pages/BrowsePage";
-import { ComingSoonPage } from "./pages/ComingSoonPage";
+import { CreateListingPage, EditListingPage, ItemDetailPage, MyListingsPage } from "./pages/ListingPages";
 import { HomePage } from "./pages/HomePage";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProfilePage } from "./pages/ProfilePage";
@@ -24,15 +24,10 @@ export default function App() {
             <Route path="signin" element={<SignInPage />} />
             <Route path="profile" element={<ProfilePage />} />
 
-            {/* Placeholders so navigation works until the listing pages are built. */}
-            <Route
-              path="list"
-              element={<ComingSoonPage title="List an item" message="Soon you'll be able to post something for other students to borrow." />}
-            />
-            <Route
-              path="items/:id"
-              element={<ComingSoonPage title="Item details" message="Soon you'll be able to see full details and request this item here." />}
-            />
+            <Route path="list" element={<CreateListingPage />} />
+            <Route path="items/:id" element={<ItemDetailPage />} />
+            <Route path="items/:id/edit" element={<EditListingPage />} />
+            <Route path="my-listings" element={<MyListingsPage />} />
 
             <Route path="*" element={<NotFoundPage />} />
           </Route>
