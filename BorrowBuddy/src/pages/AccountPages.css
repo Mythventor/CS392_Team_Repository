@@ -1,0 +1,152 @@
+.account-page {
+  max-width: 640px;
+  padding-top: 40px;
+}
+
+.account-page-narrow {
+  max-width: 460px;
+  padding-top: 72px;
+}
+
+.account-page h1 {
+  margin: 0 0 8px;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+}
+
+.account-intro {
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.panel {
+  margin-top: 22px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.signin-panel {
+  margin-top: 0;
+  text-align: center;
+}
+
+.signin-panel h1 {
+  font-size: 1.7rem;
+}
+
+.signin-panel > p:not(.notice) {
+  margin: 0 0 22px;
+  color: var(--ink-soft);
+}
+
+.signin-panel .notice {
+  margin: 16px 0 0;
+}
+
+.profile-identity {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.profile-identity > * {
+  min-width: 0;
+}
+
+.profile-identity .avatar {
+  flex: none;
+}
+
+.profile-email {
+  margin: 0 0 2px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.field {
+  margin-bottom: 20px;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.field-optional {
+  color: var(--ink-soft);
+  font-weight: 400;
+}
+
+.field input,
+.field select,
+.field textarea {
+  display: block;
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--ink);
+}
+
+.field textarea {
+  resize: vertical;
+}
+
+.field [aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.field-hint {
+  margin: 5px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.87rem;
+}
+
+.field-error {
+  margin: 5px 0 0;
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+}
+
+.form-status {
+  margin: 0;
+  color: var(--accent-ink);
+}
+
+.signout-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+@media (max-width: 720px) {
+  .account-page {
+    padding-top: 24px;
+  }
+
+  .account-page-narrow {
+    padding-top: 40px;
+  }
+
+  .panel {
+    padding: 20px;
+  }
+
+  .form-actions .button {
+    width: 100%;
+  }
+}
