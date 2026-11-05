@@ -1,0 +1,47 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isUser(uid) { return signedIn() && request.auth.uid == uid; }
+    function textUpTo(value, max) { return value is string && value.size() <= max; }
+
+    function validProfile(data) {
+      return data.keys().hasOnly(['displayName', 'photoURL', 'school', 'bio', 'createdAt', 'updatedAt'])
+        && data.keys().hasAll(['displayName', 'school', 'bio'])
+        && textUpTo(data.displayName, 60)
+        && textUpTo(data.school, 40)
+        && textUpTo(data.bio, 280)
+        && (!('photoURL' in data) || data.photoURL == null || textUpTo(data.photoURL, 2048));
+    }
+
+    function validItem(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 80
+        && textUpTo(data.category, 40)
+        && textUpTo(data.school, 40)
+        && data.status in ['available', 'unavailable'];
+    }
+
+    // Profiles are visible to signed-in students. Only the owner can change theirs.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if isUser(uid) && validProfile(request.resource.data);
+      allow update: if isUser(uid)
+        && validProfile(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    // Anyone can browse items. Only the owner can change or remove a listing.
+    match /items/{itemId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && validItem(request.resource.data);
+      allow update: if signedIn()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+        && validItem(request.resource.data);
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid;
+    }
+  }
+}
