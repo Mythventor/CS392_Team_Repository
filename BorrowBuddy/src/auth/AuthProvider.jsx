@@ -7,6 +7,7 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, onSnapshot, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
 import { useEffect, useState } from "react";
+import { DEFAULT_SCHOOL } from "../items/model";
 import { auth, db } from "../lib/firebase";
 import { AuthContext } from "./useAuth";
 
@@ -34,7 +35,7 @@ async function createProfileIfNeeded(user) {
   await setDoc(ref, {
     displayName: (user.displayName ?? "").slice(0, 60),
     photoURL: user.photoURL ?? null,
-    campus: "",
+    school: DEFAULT_SCHOOL,
     bio: "",
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
@@ -42,10 +43,10 @@ async function createProfileIfNeeded(user) {
 }
 
 function saveProfileFor(user) {
-  return ({ displayName, campus, bio }) =>
+  return ({ displayName, school, bio }) =>
     updateDoc(doc(db, "users", user.uid), {
       displayName: displayName.trim(),
-      campus,
+      school,
       bio: bio.trim(),
       updatedAt: serverTimestamp(),
     });

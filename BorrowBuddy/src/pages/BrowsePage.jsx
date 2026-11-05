@@ -1,7 +1,7 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { Icon } from "../components/icons";
 import { ItemCard, ItemGridSkeleton } from "../components/ItemCard";
-import { CAMPUSES, CATEGORIES, filterItems, filtersFromParams, hasActiveFilters } from "../items/model";
+import { CATEGORIES, filterItems, filtersFromParams, hasActiveFilters, SCHOOLS } from "../items/model";
 import { useAvailableItems } from "../items/useAvailableItems";
 import "./BrowsePage.css";
 
@@ -21,7 +21,7 @@ function Results({ items, filtered, loading, error, onClear }) {
     return (
       <div className="empty-state">
         <h3>No items match</h3>
-        <p>Try another word, or look across every category and campus.</p>
+        <p>Try another word, or look across every category and school.</p>
         <button type="button" className="button button-secondary" onClick={onClear}>Clear filters</button>
       </div>
     );
@@ -64,11 +64,11 @@ export function BrowsePage() {
               placeholder="Search items"
             />
           </label>
-          <label className="browse-campus">
-            <span className="visually-hidden">Campus</span>
-            <select value={filters.campus} onChange={(event) => setFilter("campus", event.target.value)}>
-              <option value="">All campuses</option>
-              {CAMPUSES.map((campus) => <option key={campus.id} value={campus.id}>{campus.label}</option>)}
+          <label className="browse-school">
+            <span className="visually-hidden">School</span>
+            <select value={filters.school} onChange={(event) => setFilter("school", event.target.value)}>
+              <option value="">All schools</option>
+              {SCHOOLS.map((school) => <option key={school.id} value={school.id}>{school.label}</option>)}
             </select>
           </label>
         </div>

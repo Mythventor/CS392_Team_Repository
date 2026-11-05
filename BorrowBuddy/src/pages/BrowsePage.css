@@ -27,7 +27,7 @@
 }
 
 .browse-search:focus-within,
-.browse-campus select:focus-visible {
+.browse-school select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -46,7 +46,7 @@
   color: var(--ink);
 }
 
-.browse-campus select {
+.browse-school select {
   height: 48px;
   padding-inline: 12px;
   border: 1px solid var(--line-strong);
@@ -110,7 +110,7 @@
     margin-bottom: 12px;
   }
 
-  .browse-campus select {
+  .browse-school select {
     width: 100%;
   }
 

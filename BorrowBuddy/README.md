@@ -43,11 +43,11 @@ To host the site, run `npm run build`, then `firebase deploy --only hosting`. If
 
 - Google sign-in, which is both sign-up and log-in, plus profile editing (`src/auth`, `src/pages/ProfilePage.jsx`)
 - Homepage and navigation, with a bottom tab bar on phones (`src/pages/HomePage.jsx`, `src/components/Layout.jsx`)
-- Browsing with search and category and campus filters, stored in the URL (`src/pages/BrowsePage.jsx`, `src/items`)
+- Browsing with search and category and school filters, stored in the URL (`src/pages/BrowsePage.jsx`, `src/items`)
 
 `/list` and `/items/:id` are placeholder routes in `src/App.jsx`, ready to be replaced by the real listing pages.
 
-Campuses and categories live in one place: `src/items/model.js`. The campus names there are placeholders to replace with your school's.
+Schools and categories live in one place: `src/items/model.js`. New profiles start at Northwestern University (`DEFAULT_SCHOOL`).
 
 ## Data model
 
@@ -57,7 +57,7 @@ Campuses and categories live in one place: `src/items/model.js`. The campus name
 | --- | --- | --- |
 | `displayName` | string | Up to 60 characters |
 | `photoURL` | string or null | From Google |
-| `campus` | string | A campus id from `src/items/model.js`; empty until setup is finished |
+| `school` | string | A school id from `src/items/model.js`; starts as `northwestern` |
 | `bio` | string | Up to 280 characters |
 | `createdAt`, `updatedAt` | timestamp | |
 
@@ -69,7 +69,7 @@ Homepage and browse read these fields, so new listings should save them:
 | --- | --- | --- | --- |
 | `title` | string | Yes | Up to 80 characters |
 | `category` | string | Yes | A category id from `src/items/model.js` |
-| `campus` | string | Yes | A campus id from `src/items/model.js` |
+| `school` | string | Yes | A school id from `src/items/model.js` |
 | `status` | string | Yes | `available` or `unavailable`; only `available` items are shown |
 | `ownerId` | string | Yes | The owner's uid; security rules check it |
 | `createdAt` | timestamp | Yes | Use `serverTimestamp()`; sets the newest-first order |

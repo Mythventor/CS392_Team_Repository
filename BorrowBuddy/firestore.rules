@@ -7,10 +7,10 @@ service cloud.firestore {
     function textUpTo(value, max) { return value is string && value.size() <= max; }
 
     function validProfile(data) {
-      return data.keys().hasOnly(['displayName', 'photoURL', 'campus', 'bio', 'createdAt', 'updatedAt'])
-        && data.keys().hasAll(['displayName', 'campus', 'bio'])
+      return data.keys().hasOnly(['displayName', 'photoURL', 'school', 'bio', 'createdAt', 'updatedAt'])
+        && data.keys().hasAll(['displayName', 'school', 'bio'])
         && textUpTo(data.displayName, 60)
-        && textUpTo(data.campus, 40)
+        && textUpTo(data.school, 40)
         && textUpTo(data.bio, 280)
         && (!('photoURL' in data) || data.photoURL == null || textUpTo(data.photoURL, 2048));
     }
@@ -18,7 +18,7 @@ service cloud.firestore {
     function validItem(data) {
       return data.title is string && data.title.size() > 0 && data.title.size() <= 80
         && textUpTo(data.category, 40)
-        && textUpTo(data.campus, 40)
+        && textUpTo(data.school, 40)
         && data.status in ['available', 'unavailable'];
     }
 

@@ -1,12 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { initials, needsSetup, safeNextPath, validateProfile } from "../src/auth/profileModel.js";
+import { initials, safeNextPath, validateProfile } from "../src/auth/profileModel.js";
 import { browseUrl, filterItems, filtersFromParams, hasActiveFilters, isAvailable, newestFirst } from "../src/items/model.js";
 
 const ITEMS = [
-  { id: "drill", title: "Cordless Drill", description: "Comes with bits", category: "tools", campus: "north", createdAt: 1 },
-  { id: "lamp", title: "Lamp for your desk", description: "", category: "dorm", campus: "south", createdAt: 3 },
-  { id: "book", title: "Calculus textbook", category: "books", campus: "north", createdAt: 2 },
+  { id: "drill", title: "Cordless Drill", description: "Comes with bits", category: "tools", school: "northwestern", createdAt: 1 },
+  { id: "lamp", title: "Lamp for your desk", description: "", category: "dorm", school: "depaul", createdAt: 3 },
+  { id: "book", title: "Calculus textbook", category: "books", school: "northwestern", createdAt: 2 },
 ];
 const ids = (items) => items.map((item) => item.id);
 
@@ -20,15 +20,15 @@ test("every search word must match, in any order", () => {
   assert.deepEqual(ids(filterItems(ITEMS, { q: "desk drill" })), []);
 });
 
-test("search also finds category and campus names", () => {
+test("search also finds category and school names", () => {
   assert.deepEqual(ids(filterItems(ITEMS, { q: "tools" })), ["drill"]);
-  assert.deepEqual(ids(filterItems(ITEMS, { q: "south campus" })), ["lamp"]);
+  assert.deepEqual(ids(filterItems(ITEMS, { q: "depaul university" })), ["lamp"]);
 });
 
-test("search, category, and campus filters combine", () => {
-  assert.deepEqual(ids(filterItems(ITEMS, { campus: "north" })), ["drill", "book"]);
-  assert.deepEqual(ids(filterItems(ITEMS, { campus: "north", category: "books" })), ["book"]);
-  assert.deepEqual(ids(filterItems(ITEMS, { campus: "south", q: "drill" })), []);
+test("search, category, and school filters combine", () => {
+  assert.deepEqual(ids(filterItems(ITEMS, { school: "northwestern" })), ["drill", "book"]);
+  assert.deepEqual(ids(filterItems(ITEMS, { school: "northwestern", category: "books" })), ["book"]);
+  assert.deepEqual(ids(filterItems(ITEMS, { school: "depaul", q: "drill" })), []);
 });
 
 test("blank searches keep every item", () => {
@@ -41,8 +41,8 @@ test("items with no optional fields can still be searched", () => {
 });
 
 test("URL filters drop unknown values", () => {
-  const filters = filtersFromParams(new URLSearchParams("q=tent&category=nope&campus=north"));
-  assert.deepEqual(filters, { q: "tent", category: "", campus: "north" });
+  const filters = filtersFromParams(new URLSearchParams("q=tent&category=nope&school=northwestern"));
+  assert.deepEqual(filters, { q: "tent", category: "", school: "northwestern" });
   assert.equal(hasActiveFilters(filters), true);
   assert.equal(hasActiveFilters(filtersFromParams(new URLSearchParams("q=%20%20"))), false);
 });
@@ -66,16 +66,10 @@ test("newest items come first without changing the original list", () => {
 });
 
 test("profile validation reports each problem", () => {
-  assert.deepEqual(validateProfile({ displayName: "Sam", campus: "north", bio: "" }), {});
-  const errors = validateProfile({ displayName: "   ", campus: "mars", bio: "x".repeat(281) });
-  assert.deepEqual(Object.keys(errors).sort(), ["bio", "campus", "displayName"]);
-  assert.ok(validateProfile({ displayName: "x".repeat(61), campus: "north", bio: "" }).displayName);
-});
-
-test("new profiles need a campus before setup is complete", () => {
-  assert.equal(needsSetup({ campus: "" }), true);
-  assert.equal(needsSetup({ campus: "north" }), false);
-  assert.equal(needsSetup(null), false);
+  assert.deepEqual(validateProfile({ displayName: "Sam", school: "northwestern", bio: "" }), {});
+  const errors = validateProfile({ displayName: "   ", school: "mars", bio: "x".repeat(281) });
+  assert.deepEqual(Object.keys(errors).sort(), ["bio", "displayName", "school"]);
+  assert.ok(validateProfile({ displayName: "x".repeat(61), school: "northwestern", bio: "" }).displayName);
 });
 
 test("initials use the first and last names", () => {

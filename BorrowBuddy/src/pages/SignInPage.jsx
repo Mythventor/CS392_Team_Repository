@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Navigate, useSearchParams } from "react-router-dom";
-import { needsSetup, safeNextPath } from "../auth/profileModel";
+import { safeNextPath } from "../auth/profileModel";
 import { useAuth } from "../auth/useAuth";
 import "./AccountPages.css";
 
@@ -18,16 +18,13 @@ function GoogleMark() {
 }
 
 export function SignInPage() {
-  const { user, profile, loading, error: profileError, signIn } = useAuth();
+  const { user, loading, error: profileError, signIn } = useAuth();
   const [params] = useSearchParams();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const next = safeNextPath(params.get("next"));
 
-  if (user && !loading && !profileError) {
-    if (needsSetup(profile)) return <Navigate to={`/profile?next=${encodeURIComponent(next)}`} replace />;
-    return <Navigate to={next} replace />;
-  }
+  if (user && !loading && !profileError) return <Navigate to={next} replace />;
 
   async function handleSignIn() {
     setBusy(true);

@@ -12,22 +12,24 @@ export const CATEGORIES = [
   { id: "other", label: "Other" },
 ];
 
-// Replace these with your school's real campuses. Nothing else needs to change.
-export const CAMPUSES = [
-  { id: "north", label: "North Campus" },
-  { id: "south", label: "South Campus" },
-  { id: "east", label: "East Campus" },
-  { id: "west", label: "West Campus" },
-  { id: "downtown", label: "Downtown Campus" },
+// To add a school, add it here. Nothing else needs to change.
+export const SCHOOLS = [
+  { id: "northwestern", label: "Northwestern University" },
+  { id: "uchicago", label: "University of Chicago" },
+  { id: "depaul", label: "DePaul University" },
+  { id: "loyola", label: "Loyola University Chicago" },
+  { id: "uic", label: "University of Illinois Chicago" },
 ];
+
+export const DEFAULT_SCHOOL = "northwestern";
 
 const labelOf = (options, id) => options.find((option) => option.id === id)?.label ?? "";
 
 export const categoryLabel = (id) => labelOf(CATEGORIES, id);
-export const campusLabel = (id) => labelOf(CAMPUSES, id);
+export const schoolLabel = (id) => labelOf(SCHOOLS, id);
 
 export const isCategory = (id) => CATEGORIES.some((category) => category.id === id);
-export const isCampus = (id) => CAMPUSES.some((campus) => campus.id === id);
+export const isSchool = (id) => SCHOOLS.some((school) => school.id === id);
 
 // Dates are stored as YYYY-MM-DD strings, so they compare correctly as plain text.
 export function localDateString(date = new Date()) {
@@ -44,21 +46,21 @@ export function isAvailable(item, today = localDateString()) {
 // Reads filters from the URL. Unknown values are dropped so a stale link still shows items.
 export function filtersFromParams(params) {
   const category = params.get("category") ?? "";
-  const campus = params.get("campus") ?? "";
+  const school = params.get("school") ?? "";
   return {
     q: params.get("q") ?? "",
     category: isCategory(category) ? category : "",
-    campus: isCampus(campus) ? campus : "",
+    school: isSchool(school) ? school : "",
   };
 }
 
-export function hasActiveFilters({ q, category, campus }) {
-  return Boolean(q.trim() || category || campus);
+export function hasActiveFilters({ q, category, school }) {
+  return Boolean(q.trim() || category || school);
 }
 
 export function browseUrl(filters = {}) {
   const params = new URLSearchParams();
-  for (const key of ["q", "category", "campus"]) {
+  for (const key of ["q", "category", "school"]) {
     const value = filters[key]?.trim();
     if (value) params.set(key, value);
   }
@@ -67,18 +69,18 @@ export function browseUrl(filters = {}) {
 }
 
 function searchableText(item) {
-  return [item.title, item.description, categoryLabel(item.category), campusLabel(item.campus)]
+  return [item.title, item.description, categoryLabel(item.category), schoolLabel(item.school)]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
 }
 
 // Every search word has to appear somewhere, so "desk lamp" finds a "Lamp for your desk".
-export function filterItems(items, { q = "", category = "", campus = "" } = {}) {
+export function filterItems(items, { q = "", category = "", school = "" } = {}) {
   const words = q.toLowerCase().split(/\s+/).filter(Boolean);
   return items.filter((item) => {
     if (category && item.category !== category) return false;
-    if (campus && item.campus !== campus) return false;
+    if (school && item.school !== school) return false;
     if (!words.length) return true;
     const text = searchableText(item);
     return words.every((word) => text.includes(word));

@@ -1,21 +1,17 @@
 // Profile rules that do not depend on Firebase or React.
-import { isCampus } from "../items/model.js";
+import { isSchool } from "../items/model.js";
 
 export const NAME_MAX = 60;
 export const BIO_MAX = 280;
 
-export function validateProfile({ displayName, campus, bio }) {
+export function validateProfile({ displayName, school, bio }) {
   const errors = {};
   const name = displayName.trim();
   if (!name) errors.displayName = "Add the name other students will see.";
   else if (name.length > NAME_MAX) errors.displayName = `Keep your name to ${NAME_MAX} characters.`;
-  if (!isCampus(campus)) errors.campus = "Choose your campus.";
+  if (!isSchool(school)) errors.school = "Choose your school.";
   if (bio.trim().length > BIO_MAX) errors.bio = `Keep your bio to ${BIO_MAX} characters.`;
   return errors;
-}
-
-export function needsSetup(profile) {
-  return Boolean(profile) && !isCampus(profile.campus);
 }
 
 export function initials(name) {

@@ -1,22 +1,19 @@
 import { useState } from "react";
-import { Link, Navigate, useNavigate, useSearchParams } from "react-router-dom";
-import { BIO_MAX, NAME_MAX, needsSetup, safeNextPath, validateProfile } from "../auth/profileModel";
+import { Link, Navigate } from "react-router-dom";
+import { BIO_MAX, NAME_MAX, validateProfile } from "../auth/profileModel";
 import { useAuth } from "../auth/useAuth";
 import { Avatar } from "../components/Avatar";
-import { CAMPUSES } from "../items/model";
+import { DEFAULT_SCHOOL, SCHOOLS } from "../items/model";
 import "./AccountPages.css";
 
 function ProfileForm({ user, profile, saveProfile, signOut }) {
   const [form, setForm] = useState({
     displayName: profile.displayName ?? "",
-    campus: profile.campus ?? "",
+    school: profile.school ?? DEFAULT_SCHOOL,
     bio: profile.bio ?? "",
   });
   const [errors, setErrors] = useState({});
   const [status, setStatus] = useState({ state: "idle", message: "" });
-  const navigate = useNavigate();
-  const [params] = useSearchParams();
-  const settingUp = needsSetup(profile);
 
   function update(field, value) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -33,10 +30,6 @@ function ProfileForm({ user, profile, saveProfile, signOut }) {
     setStatus({ state: "saving", message: "" });
     try {
       await saveProfile(form);
-      if (settingUp) {
-        navigate(safeNextPath(params.get("next")), { replace: true });
-        return;
-      }
       setStatus({ state: "saved", message: "Your profile is saved." });
     } catch (error) {
       console.error("Could not save the profile", error);
@@ -46,8 +39,7 @@ function ProfileForm({ user, profile, saveProfile, signOut }) {
 
   return (
     <div className="container account-page">
-      <h1>{settingUp ? "Finish setting up your profile" : "Your profile"}</h1>
-      {settingUp && <p className="account-intro">Tell other students who you are and where to find you.</p>}
+      <h1>Your profile</h1>
 
       <form className="panel profile-form" onSubmit={handleSubmit} noValidate>
         <div className="profile-identity">
@@ -73,18 +65,17 @@ function ProfileForm({ user, profile, saveProfile, signOut }) {
         </div>
 
         <div className="field">
-          <label htmlFor="campus">Campus</label>
+          <label htmlFor="school">School</label>
           <select
-            id="campus"
-            value={form.campus}
-            onChange={(event) => update("campus", event.target.value)}
-            aria-invalid={Boolean(errors.campus)}
-            aria-describedby={errors.campus ? "campus-error" : undefined}
+            id="school"
+            value={form.school}
+            onChange={(event) => update("school", event.target.value)}
+            aria-invalid={Boolean(errors.school)}
+            aria-describedby={errors.school ? "school-error" : undefined}
           >
-            <option value="">Choose your campus</option>
-            {CAMPUSES.map((campus) => <option key={campus.id} value={campus.id}>{campus.label}</option>)}
+            {SCHOOLS.map((school) => <option key={school.id} value={school.id}>{school.label}</option>)}
           </select>
-          {errors.campus && <p className="field-error" id="campus-error">{errors.campus}</p>}
+          {errors.school && <p className="field-error" id="school-error">{errors.school}</p>}
         </div>
 
         <div className="field">
@@ -105,7 +96,7 @@ function ProfileForm({ user, profile, saveProfile, signOut }) {
 
         <div className="form-actions">
           <button type="submit" className="button button-primary" disabled={status.state === "saving"}>
-            {status.state === "saving" ? "Saving…" : settingUp ? "Continue" : "Save changes"}
+            {status.state === "saving" ? "Saving…" : "Save changes"}
           </button>
           <p
             className={status.state === "error" ? "form-status field-error" : "form-status"}
@@ -125,7 +116,6 @@ function ProfileForm({ user, profile, saveProfile, signOut }) {
 
 export function ProfilePage() {
   const { user, profile, loading, error, saveProfile, signOut } = useAuth();
-  const [params] = useSearchParams();
 
   if (loading) {
     return <div className="container account-page"><p role="status">Loading your profile…</p></div>;
@@ -150,7 +140,7 @@ export function ProfilePage() {
 
   return (
     <ProfileForm
-      key={`${user.uid}-${params.get("next") ?? ""}`}
+      key={user.uid}
       user={user}
       profile={profile}
       saveProfile={saveProfile}

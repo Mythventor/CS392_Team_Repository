@@ -5,8 +5,8 @@ import { readFileSync } from "node:fs";
 import { after, before, beforeEach, test } from "node:test";
 
 let env;
-const profile = { displayName: "Sam", photoURL: null, campus: "north", bio: "", createdAt: 1, updatedAt: 1 };
-const item = { title: "Drill", category: "tools", campus: "north", status: "available", ownerId: "sam" };
+const profile = { displayName: "Sam", photoURL: null, school: "northwestern", bio: "", createdAt: 1, updatedAt: 1 };
+const item = { title: "Drill", category: "tools", school: "northwestern", status: "available", ownerId: "sam" };
 
 const as = (uid) => env.authenticatedContext(uid).firestore();
 const anonymous = () => env.unauthenticatedContext().firestore();

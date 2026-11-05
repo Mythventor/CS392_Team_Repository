@@ -1,10 +1,10 @@
 import { Link } from "react-router-dom";
-import { campusLabel, categoryLabel } from "../items/model";
+import { categoryLabel, schoolLabel } from "../items/model";
 import { Icon } from "./icons";
 import "./ItemCard.css";
 
 export function ItemCard({ item }) {
-  const campus = campusLabel(item.campus);
+  const school = schoolLabel(item.school);
   return (
     <article className="item-card">
       <Link to={`/items/${item.id}`} className="item-card-link">
@@ -16,10 +16,10 @@ export function ItemCard({ item }) {
         <div className="item-card-body">
           <p className="item-card-category">{categoryLabel(item.category) || "Other"}</p>
           <h3>{item.title}</h3>
-          {campus && (
+          {school && (
             <p className="item-card-meta">
               <Icon name="pin" size={15} />
-              <span>{campus}</span>
+              <span>{school}</span>
             </p>
           )}
           {item.ownerName && <p className="item-card-owner">Lent by {item.ownerName}</p>}
