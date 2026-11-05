@@ -134,8 +134,8 @@ function ListingForm({ item }) {
     } catch (error) {
       console.error("Listing save failed", error);
       setFailure(
-        error.code?.startsWith("storage/")
-          ? "Your photo could not be uploaded. Check your connection and try again. If it keeps failing, photo storage may need to be enabled by the project owner."
+        error.code?.startsWith("photo/")
+          ? error.message
           : "Your listing could not be saved. Your changes are still here; please try again.",
       );
       setSaving(false);
