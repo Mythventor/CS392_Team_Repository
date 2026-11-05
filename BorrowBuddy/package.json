@@ -8,9 +8,9 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "dev:emulator": "firebase emulators:exec --only auth,firestore,storage --project demo-borrowbuddy 'node scripts/seed-emulator.mjs && vite --mode emulator'",
+    "dev:emulator": "firebase emulators:exec --only auth,firestore --project demo-borrowbuddy 'node scripts/seed-emulator.mjs && vite --mode emulator'",
     "test": "node --test tests/*.test.mjs",
-    "test:rules": "firebase emulators:exec --only firestore,storage --project demo-borrowbuddy 'node --test tests/rules/*.test.mjs'"
+    "test:rules": "firebase emulators:exec --only firestore --project demo-borrowbuddy 'node --test tests/rules/*.test.mjs'"
   },
   "dependencies": {
     "firebase": "^13.2.0",

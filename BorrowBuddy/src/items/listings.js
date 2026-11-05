@@ -9,13 +9,12 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import {
-  deleteObject,
-  getDownloadURL,
-  ref,
-  uploadBytes,
-} from "firebase/storage";
-import { db, storage } from "../lib/firebase";
+import { db } from "../lib/firebase";
+import { uploadPhoto, discardUpload } from "./photoUpload";
+const photoConfig = {
+  cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME,
+  uploadPreset: import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET,
+};
 
 export function watchItem(id, next, error) {
   return onSnapshot(
@@ -46,17 +45,14 @@ export async function saveListing({ item, values, file, user, profile }) {
   const target = item
     ? doc(db, "items", item.id)
     : doc(collection(db, "items"));
+  let uploaded = null;
   let photoURL = item?.photoURL || "";
-  let photoPath = item?.photoPath || "";
-  let uploadedPath = "";
+  let photoPublicId = item?.photoPublicId || "";
   try {
     if (file) {
-      uploadedPath = `items/${user.uid}/${target.id}/${crypto.randomUUID()}`;
-      const uploaded = await uploadBytes(ref(storage, uploadedPath), file, {
-        contentType: file.type,
-      });
-      photoURL = await getDownloadURL(uploaded.ref);
-      photoPath = uploadedPath;
+      uploaded = await uploadPhoto(file, photoConfig);
+      photoURL = uploaded.photoURL;
+      photoPublicId = uploaded.photoPublicId;
     }
     const data = {
       ...values,
@@ -64,7 +60,8 @@ export async function saveListing({ item, values, file, user, profile }) {
       description: values.description.trim(),
       pickupArea: values.pickupArea.trim(),
       photoURL,
-      photoPath,
+      photoPath: file ? "" : item?.photoPath || "",
+      photoPublicId,
       updatedAt: serverTimestamp(),
     };
     if (item) await updateDoc(target, data);
@@ -78,26 +75,19 @@ export async function saveListing({ item, values, file, user, profile }) {
         createdAt: serverTimestamp(),
       });
   } catch (error) {
-    // Only remove a newly uploaded photo if Firestore definitely did not reference it.
-    // A lost response can mean the write succeeded: preserve the image if uncertain.
-    if (uploadedPath) {
+    if (uploaded) {
       try {
         const saved = await getDoc(target);
-        if (saved.data()?.photoPath !== uploadedPath)
-          await deleteObject(ref(storage, uploadedPath));
+        if (saved.data()?.photoURL !== uploaded.photoURL)
+          await discardUpload(uploaded, photoConfig);
       } catch {
-        /* Keep the image when the write outcome cannot be checked. */
+        /* Preserve the photo if a lost response makes the write outcome uncertain. */
       }
     }
     throw error;
   }
-  if (uploadedPath && item?.photoPath && item.photoPath !== uploadedPath) {
-    try {
-      await deleteObject(ref(storage, item.photoPath));
-    } catch {
-      /* Listing saved; old image cleanup can be retried separately. */
-    }
-  }
+  // Old photos are retained: permanent Cloudinary deletion requires a server secret.
+  // The account owner can remove unused assets in the Media Library without exposing it.
   return target.id;
 }
 export function archiveListing(id) {
