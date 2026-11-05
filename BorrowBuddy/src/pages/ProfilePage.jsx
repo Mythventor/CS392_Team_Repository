@@ -40,6 +40,7 @@ function ProfileForm({ user, profile, saveProfile, signOut }) {
   return (
     <div className="container account-page">
       <h1>Your profile</h1>
+      <Link to="/my-listings" className="text-link">Manage my listings</Link>
 
       <form className="panel profile-form" onSubmit={handleSubmit} noValidate>
         <div className="profile-identity">
