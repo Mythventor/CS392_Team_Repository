@@ -25,6 +25,7 @@ import {
 } from "../items/listings";
 import { ItemCard } from "../components/ItemCard";
 import { Icon } from "../components/icons";
+import { OwnerLoansNote, RequestPanel } from "../borrowing/RequestPanel";
 import "./AccountPages.css";
 import "./ListingPages.css";
 
@@ -368,14 +369,10 @@ export function ItemDetailPage() {
               <Link className="button button-secondary" to="/my-listings">
                 My listings
               </Link>
+              <OwnerLoansNote />
             </div>
           ) : (
-            !item.archived &&
-            isAvailable(item) && (
-              <p className="listing-borrow-note">
-                Borrowing requests will be available soon.
-              </p>
-            )
+            <RequestPanel item={item} />
           )}
         </section>
       </div>
