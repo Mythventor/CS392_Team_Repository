@@ -1,4 +1,5 @@
 import { isCategory, isSchool, localDateString } from "./model.js";
+import { MAX_PRICE, parsePrice } from "../deals/model.js";
 export const CONDITIONS = ["Like new", "Good", "Fair"];
 export const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 export function photoError(file) {
@@ -16,7 +17,7 @@ export function validDate(value) {
 }
 export function validateListing(
   values,
-  { editing = false, hasPhoto = false } = {},
+  { hasPhoto = false } = {},
 ) {
   const errors = {};
   for (const [key, max] of [
@@ -32,17 +33,15 @@ export function validateListing(
   if (!isSchool(values.school)) errors.school = "Choose a school.";
   if (!CONDITIONS.includes(values.condition))
     errors.condition = "Choose the item condition.";
-  if (!validDate(values.availableFrom))
-    errors.availableFrom = "Choose a valid start date.";
-  else if (!editing && values.availableFrom < localDateString())
-    errors.availableFrom = "Choose today or a future date.";
-  if (
-    !validDate(values.availableTo) ||
-    values.availableTo < values.availableFrom ||
-    values.availableTo < localDateString()
-  )
-    errors.availableTo =
-      "Choose an end date on or after the start date and today.";
+  if (parsePrice(values.price) === null)
+    errors.price = `Enter a price in whole dollars from 0 (free) to ${MAX_PRICE.toLocaleString("en-US")}.`;
+  // "Pick up by" is optional: graduating sellers use it for their move-out day.
+  if (values.availableTo) {
+    if (!validDate(values.availableTo))
+      errors.availableTo = "Choose a valid date, or leave it blank.";
+    else if (values.availableTo < localDateString())
+      errors.availableTo = "Choose today or a later date, or leave it blank.";
+  }
   if (!hasPhoto) errors.photo = "Add a photo of your item.";
   return errors;
 }

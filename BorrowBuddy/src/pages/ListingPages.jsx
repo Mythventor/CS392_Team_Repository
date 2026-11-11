@@ -25,7 +25,8 @@ import {
 } from "../items/listings";
 import { ItemCard } from "../components/ItemCard";
 import { Icon } from "../components/icons";
-import { OwnerLoansNote, RequestPanel } from "../borrowing/RequestPanel";
+import { OfferPanel, SellerDealsNote } from "../deals/OfferPanel";
+import { formatPrice } from "../deals/model";
 import "./AccountPages.css";
 import "./ListingPages.css";
 
@@ -96,7 +97,7 @@ function ListingForm({ item }) {
     school: item?.school || profile?.school || DEFAULT_SCHOOL,
     condition: item?.condition || "Good",
     pickupArea: item?.pickupArea || "",
-    availableFrom: item?.availableFrom || localDateString(),
+    price: Number.isInteger(item?.price) ? String(item.price) : "",
     availableTo: item?.availableTo || "",
   });
   const [file, setFile] = useState(null);
@@ -119,7 +120,6 @@ function ListingForm({ item }) {
     event.preventDefault();
     if (saving) return;
     const next = validateListing(values, {
-      editing: Boolean(item),
       hasPhoto: Boolean(file || item?.photoURL),
     });
     setErrors(next);
@@ -150,7 +150,7 @@ function ListingForm({ item }) {
       onChange: change,
       "aria-invalid": Boolean(errors[name]),
       "aria-describedby": errors[name] ? `${name}-error` : undefined,
-      required: true,
+      required: !options.optional,
     };
     return (
       <div className="field" key={name}>
@@ -172,8 +172,11 @@ function ListingForm({ item }) {
             type={options.type || "text"}
             maxLength={options.max}
             min={options.min}
+            inputMode={options.inputMode}
+            placeholder={options.placeholder}
           />
         )}
+        {options.hint && <p className="field-hint">{options.hint}</p>}
         {errors[name] && (
           <p className="field-error" id={`${name}-error`}>
             {errors[name]}
@@ -185,9 +188,10 @@ function ListingForm({ item }) {
   return (
     <div className="container listing-page listing-editor">
       <Link to="/my-listings">My listings</Link>
-      <h1>{item ? "Edit your listing" : "Give something a second use."}</h1>
+      <h1>{item ? "Edit your listing" : "Pass it down."}</h1>
       <p className="listing-intro">
-        Share an item with students at your school. Lending is free.
+        Sell what you no longer need to students at your school, or give it away
+        for free. Buyers pay you in person when they pick it up.
       </p>
       <form className="panel listing-form" onSubmit={submit} noValidate>
         <fieldset disabled={saving}>
@@ -237,13 +241,17 @@ function ListingForm({ item }) {
             address.
           </p>
           <div className="listing-fields">
-            {field("availableFrom", "Available from", {
-              type: "date",
-              min: item ? undefined : localDateString(),
+            {field("price", "Price in dollars", {
+              inputMode: "numeric",
+              max: 6,
+              placeholder: "e.g. 25",
+              hint: "Whole dollars. Enter 0 to give it away for free.",
             })}
-            {field("availableTo", "Available through", {
+            {field("availableTo", "Pick up by (optional)", {
               type: "date",
-              min: values.availableFrom || localDateString(),
+              optional: true,
+              min: localDateString(),
+              hint: "Moving out? Add the last day buyers can collect it.",
             })}
           </div>
           {failure && (
@@ -266,6 +274,12 @@ function ListingForm({ item }) {
       </form>
     </div>
   );
+}
+function listingStatus(item) {
+  if (item.archived) return "Archived";
+  if (item.status === "sold") return "Sold";
+  if (item.status === "reserved") return "Reserved for a buyer";
+  return isAvailable(item) ? "Available" : "Unavailable / past pick-up date";
 }
 export function CreateListingPage() {
   return (
@@ -331,13 +345,8 @@ export function ItemDetailPage() {
         <section>
           <p className="listing-eyebrow">{categoryLabel(item.category)}</p>
           <h1>{item.title}</h1>
-          <p className="listing-status">
-            {item.archived
-              ? "Archived"
-              : isAvailable(item)
-                ? "Available to borrow"
-                : "Unavailable"}
-          </p>
+          <p className="listing-price">{formatPrice(item.price)}</p>
+          <p className="listing-status">{listingStatus(item)}</p>
           <p className="listing-description">
             {item.description || "No description provided."}
           </p>
@@ -347,18 +356,17 @@ export function ItemDetailPage() {
             <dt>School</dt>
             <dd>{schoolLabel(item.school)}</dd>
             <dt>Pickup area</dt>
-            <dd>{item.pickupArea || "Arrange with the owner"}</dd>
-            <dt>Availability</dt>
-            <dd>
-              {item.availableFrom || "Now"} —{" "}
-              {item.availableTo || "Ask the owner"}
-            </dd>
-            <dt>Lent by</dt>
+            <dd>{item.pickupArea || "Arrange with the seller"}</dd>
+            <dt>Pick up by</dt>
+            <dd>{item.availableTo || "Ask the seller"}</dd>
+            <dt>Payment</dt>
+            <dd>In person, at pickup</dd>
+            <dt>Sold by</dt>
             <dd>{item.ownerName || "A student"}</dd>
           </dl>
           {owner ? (
             <div className="listing-actions">
-              {!item.archived && (
+              {!item.archived && item.status !== "sold" && (
                 <Link
                   className="button button-primary"
                   to={`/items/${id}/edit`}
@@ -369,10 +377,10 @@ export function ItemDetailPage() {
               <Link className="button button-secondary" to="/my-listings">
                 My listings
               </Link>
-              <OwnerLoansNote />
+              <SellerDealsNote />
             </div>
           ) : (
-            <RequestPanel item={item} />
+            <OfferPanel item={item} />
           )}
         </section>
       </div>
@@ -417,10 +425,10 @@ function MyListings() {
       <div className="listing-heading">
         <div>
           <h1>My listings</h1>
-          <p className="listing-intro">Manage the things you share.</p>
+          <p className="listing-intro">Manage the things you are selling.</p>
         </div>
         <Link className="button button-primary" to="/list">
-          List an item
+          Sell an item
         </Link>
       </div>
       {message && (
@@ -436,10 +444,10 @@ function MyListings() {
         <div className="empty-state">
           <h2>Your first listing starts here.</h2>
           <p>
-            A calculator, a toolkit, a spare chair—someone nearby could use it.
+            A mini fridge, a desk lamp, last semester’s textbook—someone nearby could use it.
           </p>
           <Link to="/list" className="button button-primary">
-            List an item
+            Sell an item
           </Link>
         </div>
       ) : (
@@ -447,14 +455,14 @@ function MyListings() {
           {state.items.map((item) => (
             <section key={item.id} className="managed-listing">
               <ItemCard item={item} />
-              <p className="listing-status">
-                {item.archived
-                  ? "Archived"
-                  : isAvailable(item)
-                    ? "Available"
-                    : "Unavailable / expired"}
-              </p>
-              {!item.archived &&
+              <p className="listing-status">{listingStatus(item)}</p>
+              {item.status === "reserved" && (
+                <p className="field-hint">
+                  Reserved for a buyer. Open <Link to="/deals?tab=selling">Deals</Link> to finish
+                  or call off the sale.
+                </p>
+              )}
+              {!item.archived && item.status !== "reserved" && item.status !== "sold" &&
                 (confirm === item.id ? (
                   <div className="archive-confirm">
                     <p>

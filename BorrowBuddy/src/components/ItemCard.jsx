@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { formatPrice } from "../deals/model";
 import { categoryLabel, schoolLabel } from "../items/model";
 import { Icon } from "./icons";
 import "./ItemCard.css";
@@ -14,7 +15,10 @@ export function ItemCard({ item }) {
             : <Icon name={item.category} size={44} />}
         </div>
         <div className="item-card-body">
-          <p className="item-card-category">{categoryLabel(item.category) || "Other"}</p>
+          <div className="item-card-top">
+            <p className="item-card-category">{categoryLabel(item.category) || "Other"}</p>
+            {Number.isInteger(item.price) && <p className="item-card-price">{formatPrice(item.price)}</p>}
+          </div>
           <h3>{item.title}</h3>
           {school && (
             <p className="item-card-meta">
@@ -22,7 +26,7 @@ export function ItemCard({ item }) {
               <span>{school}</span>
             </p>
           )}
-          {item.ownerName && <p className="item-card-owner">Lent by {item.ownerName}</p>}
+          {item.ownerName && <p className="item-card-owner">Sold by {item.ownerName}</p>}
         </div>
       </Link>
     </article>

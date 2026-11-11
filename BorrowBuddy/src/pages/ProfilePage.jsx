@@ -87,7 +87,7 @@ function ProfileForm({ user, profile, saveProfile, signOut }) {
             value={form.bio}
             onChange={(event) => update("bio", event.target.value)}
             maxLength={BIO_MAX}
-            placeholder="Your year, major, or the kind of things you lend."
+            placeholder="Your year, major, or the kind of things you sell."
             aria-invalid={Boolean(errors.bio)}
             aria-describedby={errors.bio ? "bio-error" : "bio-count"}
           />

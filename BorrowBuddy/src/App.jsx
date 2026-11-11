@@ -5,7 +5,7 @@ import { isFirebaseConfigured } from "./lib/firebase";
 import { BrowsePage } from "./pages/BrowsePage";
 import { CreateListingPage, EditListingPage, ItemDetailPage, MyListingsPage } from "./pages/ListingPages";
 import { HomePage } from "./pages/HomePage";
-import { LoanDetailPage, LoansPage } from "./pages/LoanPages";
+import { DealDetailPage, DealsPage } from "./pages/DealPages";
 import { NotFoundPage } from "./pages/NotFoundPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { SetupNotice } from "./pages/SetupNotice";
@@ -30,8 +30,8 @@ export default function App() {
             <Route path="items/:id/edit" element={<EditListingPage />} />
             <Route path="my-listings" element={<MyListingsPage />} />
 
-            <Route path="loans" element={<LoansPage />} />
-            <Route path="loans/:id" element={<LoanDetailPage />} />
+            <Route path="deals" element={<DealsPage />} />
+            <Route path="deals/:id" element={<DealDetailPage />} />
 
             <Route path="*" element={<NotFoundPage />} />
           </Route>

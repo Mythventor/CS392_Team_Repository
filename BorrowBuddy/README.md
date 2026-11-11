@@ -1,6 +1,8 @@
-# BorrowBuddy
+# Passdown
 
-Students borrow things from other students on their campus. Built with React, Vite, Firebase Spark (Google sign-in, Cloud Firestore and Hosting), and Cloudinary Free for listing photos. Firebase Cloud Storage is not used.
+Students sell (or give away) things they no longer need to other students on their campus, especially when graduating or moving out. Payment happens in person at pickup, never in the app.
+
+Passdown started as BorrowBuddy, a lending app. Peer feedback showed people didn't trust lending to strangers, so it became a resale app. It still has the parts testers liked: messages, the pickup plan, and a guarantee that an item can't be promised to two people. The Firebase project and site address (`borrowbuddy-cs392`) keep their old names. Built with React, Vite, Firebase Spark (Google sign-in, Cloud Firestore and Hosting), and Cloudinary Free for listing photos. Firebase Cloud Storage is not used.
 
 ## Try it locally
 
@@ -32,7 +34,7 @@ To host the site, run `npm run build`, then `firebase deploy --only hosting`. If
 
 Set `VITE_CLOUDINARY_CLOUD_NAME` and `VITE_CLOUDINARY_UPLOAD_PRESET` in `.env.local` before building. Both are public configuration; never expose the API secret in browser code or commit it.
 
-Create a dedicated unsigned image upload preset with JPG/PNG/WebP allowed formats, generated unique IDs, public ID overrides disabled, and a BorrowBuddy asset folder. Unsigned uploads cannot overwrite existing photos. Enable short-lived deletion tokens for failed-save cleanup. The app rejects files over 5 MB; this client-side limit is not a server-side access control. Cloudinary presets do not support a per-preset file-size limit.
+Create a dedicated unsigned image upload preset with JPG/PNG/WebP allowed formats, generated unique IDs, public ID overrides disabled, and a Passdown asset folder. Unsigned uploads cannot overwrite existing photos. Enable short-lived deletion tokens for failed-save cleanup. The app rejects files over 5 MB; this client-side limit is not a server-side access control. Cloudinary presets do not support a per-preset file-size limit.
 
 The public preset allows uploads from anyone who knows its name, independently of Firebase sign-in. For a small project, monitor the Free quota and disable the preset if abused; authenticated signed uploads would require a separate backend. Listing edits remain protected by Firestore owner rules. Photo URLs and public IDs are saved in the listing; deletion tokens are never persisted. Replaced/archived photos are retained in the Media Library for account-owner cleanup, preserving existing links without exposing an admin secret.
 
@@ -44,7 +46,7 @@ Deploy only Firestore rules and Hosting: `firebase deploy --only firestore:rules
 | --- | --- |
 | `npm run dev` | Runs the app against the project in `.env.local` |
 | `npm run dev:emulator` | Runs the app against local emulators with sample items |
-| `npm test` | Runs unit tests for search, filters, profiles, listings, and borrowing |
+| `npm test` | Runs unit tests for search, filters, profiles, listings, and deals |
 | `npm run test:rules` | Tests `firestore.rules` on the Firestore emulator |
 | `npm run lint` | Checks the code with ESLint |
 | `npm run build` | Builds the production site into `dist/` |
@@ -57,14 +59,15 @@ Deploy only Firestore rules and Hosting: `firebase deploy --only firestore:rules
 
 Listing creation, details, editing and archiving are implemented at `/list`, `/items/:id`, `/items/:id/edit`, and `/my-listings`.
 
-Borrowing and loan management (`src/borrowing`, `src/pages/LoanPages.jsx`):
+Buying and selling (`src/deals`, `src/pages/DealPages.jsx`):
 
-- **Request an item**: the item page has a "Request to borrow" form. Borrowers pick a first day and a return day (up to 14 days, inside the listing's dates) and can add a note. Days already booked are listed and can't be chosen.
-- **Accept or decline**: owners answer requests from `/loans/:id`. Accepting books the days; other pending requests that overlap them are declined automatically with a reason. Owners can add a reason when declining.
-- **Loans page** (`/loans`): a Borrowing tab and a Lending tab, grouped into Needs your attention, Out right now, Coming up, and History. The nav shows a badge with the number of requests waiting for you.
-- **Pickup coordination**: either person suggests a place and time and the other confirms it; there's also a message thread for each loan.
-- **Tracking**: either person marks the pickup, only the owner confirms the return, and either person can cancel before pickup. Every step is time-stamped in a timeline, and late returns are flagged as overdue.
-- **No double bookings**: accepting writes one lock document per day in the same transaction. Security rules only allow creating a lock that doesn't exist yet, so two loans can never hold the same day, even if two people accept at the same moment. Cancelling or returning releases the days.
+- **Prices**: every listing has a price in whole dollars, or 0 for free. An optional "Pick up by" date suits move-out sales; the listing hides after that day.
+- **Make an offer**: the item page lets buyers ask for it at the asking price or offer less, with an optional note. Free items get an "Ask for it" button.
+- **Accept or decline**: sellers answer offers from `/deals/:id`. Accepting reserves the item for that buyer, and other buyers see it as reserved. Sellers can add a reason when declining.
+- **Deals page** (`/deals`): a Buying tab and a Selling tab, grouped into Needs your answer, Reserved, Waiting on the seller, and History. The nav shows a badge with the number of offers waiting for you.
+- **Pickup coordination**: either person suggests a place and time and the other confirms it; there's also a message thread for each deal.
+- **Finishing**: after meeting and getting paid, the seller marks it sold. Any other pending offers on the item are declined automatically. Either person can call off a reserved deal, which puts the item back on sale.
+- **Never sold twice**: accepting sets the item to `reserved` for that offer in the same transaction. Security rules only let an `available` item become reserved, so two buyers can never hold the same item, even if the seller accepts two offers at the same moment.
 
 Schools and categories live in one place: `src/items/model.js`. New profiles start at Northwestern University (`DEFAULT_SCHOOL`).
 
@@ -89,41 +92,40 @@ Homepage and browse read these fields, so new listings should save them:
 | `title` | string | Yes | Up to 80 characters |
 | `category` | string | Yes | A category id from `src/items/model.js` |
 | `school` | string | Yes | A school id from `src/items/model.js` |
-| `status` | string | Yes | `available` or `unavailable`; only `available` items are shown |
+| `status` | string | Yes | `available`, `reserved`, `sold`, or `unavailable`; only `available` items are shown |
+| `price` | integer | Yes for new listings | Whole dollars, 0–10000; 0 means free |
+| `reservedFor` | string or null | No | The accepted offer's id while `reserved`; only set by the deal flow |
 | `ownerId` | string | Yes | The owner's uid; security rules check it |
 | `createdAt` | timestamp | Yes | Use `serverTimestamp()`; sets the newest-first order |
 | `description` | string | No | Included in search |
 | `photoURL` | string | No | Cards show a category icon when it's missing |
-| `ownerName` | string | No | Shown as "Lent by". It's a copy, so it won't change if the owner renames themselves |
-| `availableTo` | string | No | `YYYY-MM-DD`; the item is hidden after this date |
+| `ownerName` | string | No | Shown as "Sold by". It's a copy, so it won't change if the owner renames themselves |
+| `availableTo` | string | No | `YYYY-MM-DD`, shown as "Pick up by"; the item is hidden after this date |
 
 `firestore.rules` already lets owners create, edit, and delete their own items. New collections need their own rules because everything else is closed by default.
 
-### `requests/{requestId}`
+### `offers/{offerId}`
 
-One loan, from request to return. Only the owner and the borrower can read it, and it is never deleted.
+One deal, from offer to sale. Only the seller and the buyer can read it, and it is never deleted.
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| `itemId`, `itemTitle`, `itemPhotoURL` | string | Copied from the item when requested |
-| `ownerId`, `ownerName` | string | Must match the item's owner |
-| `borrowerId`, `borrowerName` | string | The signed-in borrower; can't be the owner |
-| `startDate`, `endDate` | string | `YYYY-MM-DD`, at most 14 days, inside the item's available dates |
+| `itemId`, `itemTitle`, `itemPhotoURL` | string | Copied from the item when the offer is made |
+| `sellerId`, `sellerName` | string | Must match the item's owner |
+| `buyerId`, `buyerName` | string | The signed-in buyer; can't be the seller |
+| `listPrice` | integer | The asking price when the offer was made |
+| `offerPrice` | integer | At most `listPrice`; equal means the buyer takes the asking price |
 | `message` | string | Optional note, up to 500 characters |
-| `status` | string | `pending` → `accepted` / `declined` / `cancelled`; `accepted` → `picked_up` / `cancelled`; `picked_up` → `returned` |
-| `createdAt`, `updatedAt`, `acceptedAt`, `declinedAt`, `cancelledAt`, `pickedUpAt`, `returnedAt` | timestamp | Server time for each step |
-| `cancelledBy`, `pickedUpBy` | string | Who did it |
-| `declineReason` | string | Optional, shown to the borrower |
+| `status` | string | `pending` → `accepted` / `declined` / `cancelled`; `accepted` → `sold` / `cancelled` |
+| `createdAt`, `updatedAt`, `acceptedAt`, `declinedAt`, `cancelledAt`, `soldAt` | timestamp | Server time for each step |
+| `cancelledBy` | string | Who called it off |
+| `declineReason` | string | Optional, shown to the buyer |
 | `pickup` | map | `{ place, time, note, proposedBy, confirmedBy }`; `time` is `YYYY-MM-DDTHH:mm` |
 
-The rules check who can make each status change, and that a change touches only its own fields. For example, a borrower can't move the dates while marking the pickup.
+The rules check who can make each status change, that a change touches only its own fields, and that the item changes with it: accepting needs the item reserved for this offer, calling off an accepted deal needs the item released, and selling needs the item marked sold.
 
-### `requests/{requestId}/messages/{messageId}`
+### `offers/{offerId}/messages/{messageId}`
 
-`senderId`, `senderName`, `text` (1–1000 characters), `createdAt`. Only the two people in the loan can read or send messages, and only as themselves.
+`senderId`, `senderName`, `text` (1–1000 characters), `createdAt`. Only the two people in the deal can read or send messages, and only as themselves.
 
-### `items/{itemId}/bookedDays/{YYYY-MM-DD}`
-
-`{ requestId }`. One document for each day an accepted loan holds. Anyone can read them so the item page can show booked days. They can only be created by the item's owner for an accepted request covering that day, and they're deleted when that loan is cancelled or returned.
-
-Borrowing rules are tested in `tests/rules/borrowing.rules.test.mjs` (`npm run test:rules`).
+Deal rules are tested in `tests/rules/deals.rules.test.mjs` (`npm run test:rules`). Old `requests` and `bookedDays` data from BorrowBuddy is no longer read and its rules were removed, so it's closed by default.

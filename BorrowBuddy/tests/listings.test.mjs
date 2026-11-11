@@ -9,39 +9,31 @@ const item = {
   category: "electronics",
   school: "northwestern",
   condition: "Good",
-  availableFrom: "2099-01-01",
+  price: "25",
   availableTo: "2099-01-07",
 };
 test("new listing accepts valid data and requires a photo", () => {
   assert.deepEqual(validateListing(item, { hasPhoto: true }), {});
   assert.ok(validateListing(item).photo);
 });
-test("rejects reversed dates, impossible dates, unknown categories and blank details", () => {
+test("rejects bad prices, impossible dates, unknown categories and blank details", () => {
   const errors = validateListing(
     {
       ...item,
-      availableFrom: "2099-02-30",
-      availableTo: "2099-01-01",
+      price: "12.50",
+      availableTo: "2099-02-30",
       category: "fake",
       pickupArea: " ",
     },
     { hasPhoto: true },
   );
-  for (const field of [
-    "availableFrom",
-    "availableTo",
-    "category",
-    "pickupArea",
-  ])
+  for (const field of ["price", "availableTo", "category", "pickupArea"])
     assert.ok(errors[field]);
 });
-test("existing listings can retain a past start but new listings cannot", () => {
-  const past = { ...item, availableFrom: "2000-01-01" };
-  assert.ok(validateListing(past, { hasPhoto: true }).availableFrom);
-  assert.equal(
-    validateListing(past, { hasPhoto: true, editing: true }).availableFrom,
-    undefined,
-  );
+test("free items are allowed and the pick-up-by date is optional but not in the past", () => {
+  assert.deepEqual(validateListing({ ...item, price: "0", availableTo: "" }, { hasPhoto: true }), {});
+  assert.ok(validateListing({ ...item, availableTo: "2000-01-01" }, { hasPhoto: true }).availableTo);
+  assert.ok(validateListing({ ...item, price: "" }, { hasPhoto: true }).price);
 });
 test("photos reject unsupported files and files over 5 MB", () => {
   assert.ok(photoError({ type: "image/svg+xml", size: 100 }));

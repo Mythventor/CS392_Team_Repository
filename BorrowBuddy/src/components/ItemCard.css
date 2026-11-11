@@ -116,3 +116,19 @@
     font-size: 0.95rem;
   }
 }
+
+.item-card-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.item-card-price {
+  margin: 0;
+  color: var(--accent-ink);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  white-space: nowrap;
+}

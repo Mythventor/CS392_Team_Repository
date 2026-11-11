@@ -46,7 +46,7 @@ export function SignInPage() {
   return (
     <div className="container account-page account-page-narrow">
       <div className="panel signin-panel">
-        <h1>Welcome to BorrowBuddy</h1>
+        <h1>Welcome to Passdown</h1>
         <p>Sign in or create your account with Google. It only takes a moment.</p>
         <button
           type="button"

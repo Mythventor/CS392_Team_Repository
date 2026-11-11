@@ -1,5 +1,6 @@
 import {
   collection,
+  deleteField,
   doc,
   getDoc,
   onSnapshot,
@@ -10,6 +11,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../lib/firebase";
+import { parsePrice } from "../deals/model";
 import { uploadPhoto, discardUpload } from "./photoUpload";
 const photoConfig = {
   cloudName: import.meta.env.VITE_CLOUDINARY_CLOUD_NAME,
@@ -54,8 +56,11 @@ export async function saveListing({ item, values, file, user, profile }) {
       photoURL = uploaded.photoURL;
       photoPublicId = uploaded.photoPublicId;
     }
+    // Prices are stored as whole dollars (0 = free). "Pick up by" is optional.
+    const { availableTo, ...rest } = values;
     const data = {
-      ...values,
+      ...rest,
+      price: parsePrice(values.price),
       title: values.title.trim(),
       description: values.description.trim(),
       pickupArea: values.pickupArea.trim(),
@@ -64,6 +69,10 @@ export async function saveListing({ item, values, file, user, profile }) {
       photoPublicId,
       updatedAt: serverTimestamp(),
     };
+    if (availableTo) data.availableTo = availableTo;
+    else if (item) data.availableTo = deleteField();
+    // Listings from before Passdown had a start date; it no longer applies.
+    if (item) data.availableFrom = deleteField();
     if (item) await updateDoc(target, data);
     else
       await setDoc(target, {
