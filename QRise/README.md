@@ -1,88 +1,27 @@
-# QRise · Alarm Management and Alarm System
+Here! - Quick and Easy Attendance
 
-Person 1 provides the alarm settings feature:
+Here! is a free web app designed around a simple idea - simplifying attendance. Here! has a number of features to help streamline the process and make checking in easy and intuitive for both teachers and students alike, such as:
 
-- Create, edit, and delete alarms.
-- Set alarm times and repeat days.
-- Enable and disable alarms.
-- Provide an accessible alarm settings form and alarm list.
+- QR code integration: Teachers can generate a new QR code for each day of attendance, or just have one code that refreshes each day. Students scan the displayed QR code and fill out a quick form to let their instructor know they're present and ready for class! In addition, checking in also provides the students with an instructor-set heads-up prompt, which could be a summary of today's lecture material, reminders about important deadlines, or a discussion prompt to get students ready for class!
+- CSV Exports: Teachers can generate a CSV of each day's attendance to compare against their class list, helping to quickly identify who is and isn't there!
+- Teacher accounts use a unique username and password. Guest access is not currently available.
 
-## Run the feature preview
+The app does require some cookies to be used in order to store data without an account.
 
-Use Node.js 22.12+ (or a supported newer release).
+## Current prototype
 
-```sh
-npm ci
-npm run dev
-```
+Teachers can create an account with a unique username and password, sign in, and sign out. Usernames are 3–24 ASCII letters, numbers, underscores, or hyphens; uniqueness is case-insensitive. Passwords must be at least 8 characters. Guests can enter using Firebase Anonymous Authentication, create classes, generate QR check-in links, customize class details, and export a class's check-ins. Students submit check-ins through the QR link.
 
-`src/App.jsx` provides the home dashboard and Home, Alarms, and QR code navigation. Alarm settings and QR-to-alarm pairings are saved in browser local storage and restored on reload. The QR code screen creates a unique printable/downloadable code per alarm. Scanning uses the device camera; camera access requires a secure browser context (HTTPS or localhost). Scheduler and ringing state reset when the page reloads.
+The Firebase database starts with no sample classes or student records. Existing browser-local data from the earlier prototype is not automatically migrated into Firebase.
 
-If saved alarm data is unavailable or unreadable, QRise displays an error and starts with an empty in-memory schedule. If the browser blocks storage or saving fails, the app keeps the current session usable and reports that changes could not be saved.
+## Firebase authentication
 
-## Component interface
+In Firebase Console, enable both **Authentication → Sign-in method → Email/Password** and **Anonymous**. Copy `.env.example` to `.env.local` and fill in the Firebase Web App config values; `.env.local` is ignored by Git. Vite embeds these values at build time, so rebuild and redeploy after changing them.
 
-`src/alarms/AlarmManagement.jsx` exports a controlled component:
+Firebase email/password authentication requires an email-shaped identifier, but the app intentionally asks only for a username. It maps the normalized username to an internal, non-deliverable address in the reserved `.invalid` domain. Firebase Authentication enforces uniqueness of that identifier, making usernames unique without a client-writable username registry. Usernames are case-insensitive.
 
-```jsx
-<AlarmManagement alarms={alarms} onChange={setAlarms} />
-```
+Because accounts have no real email address, email verification, password reset, and account recovery are not available. Losing a password currently means losing access to that account; do not use this prototype for important data. A later version should choose a recoverable identity method before using accounts for production.
 
-The parent supplies the array and receives the updated array after create, edit, delete, or enable/disable actions. Each alarm has this shape:
+Guest classes and check-ins are scoped by the anonymous Firebase UID. The anonymous identity persists in that browser; ending the guest session, clearing site data, or switching browsers may make guest-owned classes inaccessible. Guest data is not linked to teacher accounts. Review and deploy `database.rules.json` before use (`firebase deploy --project here--attendance --only database`). Do not make database writes public as a workaround for authentication configuration problems. To test authentication locally, configure the Firebase Auth Emulator using `VITE_FIREBASE_AUTH_EMULATOR_HOST`.
 
-```js
-{ id: 'uuid', label: 'Morning alarm', time: '07:00', days: [1, 2, 3, 4, 5], enabled: true }
-```
-
-Time is a local 24-hour `HH:mm` string. Repeat days use Sunday = 0 through Saturday = 6; an empty array means no repeat. The settings form defaults new alarms to weekdays at 07:00, enabled. Nothing is created until Save alarm is selected.
-
-Scheduling, triggering, sound, and QR-gated ringing/dismissal are implemented in `src/alarm-system/`. The alarm management component remains separate from the app shell and scheduler.
-
-## Person 3: QR codes and verification
-
-On the QR code screen, generate a code for each alarm and print it or download its PNG image. Replacing a code invalidates the previous one. Pairings are stored separately from alarm settings in local storage. Scan is available while an alarm is ringing; the live camera preview appears inside the ringing dialog. A code dismisses only the alarm it is paired with. A mismatch shows an error and leaves the alarm ringing; after three mismatches for the same ringing occurrence in a rolling five-minute window, the failsafe disables and dismisses that alarm. Camera errors can be retried, and cancelling a scan does not count as a mismatch. Camera tracks are stopped after a scan completes or is cancelled.
-
-QR codes contain an opaque random identifier, not alarm details. Pairing records are local to this browser, so clearing browser storage or moving the app to another device requires generating new codes there. This browser implementation cannot dismiss an alarm after a page refresh because the in-memory ringing queue is not restored.
-
-## Verify this feature
-
-```sh
-npm test
-npm run lint
-npm run build
-npx playwright install chromium
-npm run test:e2e
-```
-
-Tests cover alarm management, local alarm and QR-pairing persistence, navigation, scheduling, ringing, audio start/stop, failed verification, failsafe behavior, and successful dismissal using a test scanner adapter. Real camera access requires a device/browser permission and should be verified on the target hardware.
-
-
-## Person 2: Alarm System
-
-Enable alarm sound once after opening the app, then create an alarm. Keep the page open and the device awake. Sound uses a generated looping tone, so no sound file or network fetch is required. The ringing dialog has no stop/snooze button and blocks Escape dismissal.
-
-This is a browser preview, not a native mobile alarm: closed tabs, device sleep, browser audio restrictions, system volume, and OS suspension can prevent sound or delay triggering. Refreshing clears the current in-memory alarm. A native scheduling/background audio solution is required for reliable locked-phone wake-up behavior. See [browser autoplay restrictions](https://developer.mozilla.org/en-US/docs/Web/Media/Guides/Autoplay) and [background timer throttling](https://developer.mozilla.org/en-US/docs/Web/API/Page_Visibility_API).
-
-### Integration contract for Persons 3 and 4
-
-Mount `AlarmSystem` once at the app root, including while navigating between screens:
-
-```jsx
-<AlarmSystem
-  alarms={alarms}
-  onOneShotFired={disableOneShots}
-  scanAndVerify={scanAndVerify}
-  onFailsafe={disableAlarms}
-/>
-```
-
-- `alarms` uses Person 1’s existing model. Times and repeat days use the device’s local timezone.
-- `onOneShotFired(ids)` must disable the provided alarm IDs in parent state (and persist them when storage is added). The preview implements this. Disabling a consumed alarm does not dismiss its ringing screen.
-- Person 3 supplies `async scanAndVerify({ alarm, signal })`. Open the camera UI, validate against the user's registered QR code, and resolve to literal `true` only after a match. Resolve `false` for a mismatch or cancellation; reject on camera/scanner errors. Failures leave sound running and permit retry. Honor the AbortSignal and release camera tracks when finished or aborted. Render scanner UI inside the ringing dialog (for example, portal into `.ringing-dialog`) so the modal does not make it inert. The app passes the dialog's video element as an additional `video` property.
-- `onFailsafe(ids)` disables the provided alarms in parent state after three incorrect scans for a ringing occurrence within five minutes; the active occurrence is dismissed so sound can stop when the queue is empty.
-- No scanner is mocked into the shipped app. The production app wires the camera scanner and local QR pairing validator; automated browser tests may supply a fake verifier.
-- Simultaneous alarms queue in order. Verification dismisses only the current occurrence; sound continues until the queue is empty. Active ringing survives edits/deletion of the underlying alarm.
-
-A one-time alarm schedules at the next future occurrence of its time (tomorrow if today's time has passed). Repeating alarms select the next configured local weekday. Timers check every 500 ms and on focus/visibility changes. A delayed check rings overdue alarms once and advances repeating alarms to the next future occurrence, rather than replaying every missed day. Editing time/repeat days reschedules; disabling or deleting cancels pending occurrences. Scheduler state is in memory, so Person 4 must consider restoration and clock/timezone changes in final integration.
-
-Files: `scheduler.js` handles scheduling, `sound.js` handles audio, and `AlarmSystem.jsx` handles the queue, ringing screen, and verification bridge.
+The browser UI remains unavailable when Firebase configuration is missing. For `auth/api-key-not-valid`, verify the deployed Web API key/project configuration before expecting account creation or sign-in to work.

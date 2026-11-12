@@ -1,0 +1,72 @@
+{
+  "rules": {
+    "owners": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+    "publicClasses": {
+      "$classId": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || (data.child('ownerUid').val() === auth.uid && (!newData.exists() || newData.child('ownerUid').val() === auth.uid)))",
+        ".validate": "newData.hasChildren(['ownerUid', 'name', 'prompt'])",
+        "ownerUid": {
+          ".validate": "newData.isString()"
+        },
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 100"
+        },
+        "prompt": {
+          ".validate": "newData.isString() && newData.val().length <= 300"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "sessionTokens": {
+      "$classId": {
+        ".read": "auth != null && data.child('ownerUid').val() === auth.uid",
+        ".write": "auth != null && ((!data.exists() && newData.child('ownerUid').val() === auth.uid) || (data.child('ownerUid').val() === auth.uid && (!newData.exists() || newData.child('ownerUid').val() === auth.uid)))",
+        ".validate": "newData.hasChildren(['ownerUid', 'code'])",
+        "ownerUid": {
+          ".validate": "newData.isString()"
+        },
+        "code": {
+          ".validate": "newData.isString() && newData.val().length === 12"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+    "checkins": {
+      "$classId": {
+        ".read": "auth != null && root.child('publicClasses').child($classId).child('ownerUid').val() === auth.uid",
+        "$checkinId": {
+          ".write": "auth != null && ((root.child('publicClasses').child($classId).child('ownerUid').val() === auth.uid) || (!data.exists() && newData.child('sessionCode').val() === root.child('sessionTokens').child($classId).child('code').val()))",
+          ".validate": "newData.hasChildren(['name', 'studentId', 'status', 'checkedInAt', 'sessionCode'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
+          },
+          "studentId": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 80"
+          },
+          "status": {
+            ".validate": "newData.val() === 'Present'"
+          },
+          "checkedInAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "sessionCode": {
+            ".validate": "newData.isString()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    }
+  }
+}

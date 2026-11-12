@@ -12,6 +12,9 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@firebase/app": "^0.16.5",
+    "@firebase/auth": "^1.13.9",
+    "@firebase/database": "^1.1.5",
     "@zxing/browser": "^0.2.1",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",

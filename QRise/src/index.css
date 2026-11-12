@@ -1,17 +1,17 @@
 :root {
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  color: #382b21;
-  background: #faf7f1;
-  --ink: #382b21;
-  --accent: #a85125;
-  --accent-dark: #843e1d;
-  --accent-soft: #faead9;
-  --muted: #796b5b;
-  --subtle: #9b8d7d;
-  --border: #eadfce;
-  --surface: #fffdfa;
-  --page: #faf7f1;
-  --focus: #d99a5b;
+  font-family: "Segoe Print", "Bradley Hand", "Comic Sans MS", cursive;
+  color: #3e4035;
+  background: #f3eddf;
+  --ink: #3e4035;
+  --accent: #a55f45;
+  --accent-dark: #754634;
+  --accent-soft: #f2e2cf;
+  --muted: #726d5e;
+  --subtle: #918a78;
+  --border: #d8cdb7;
+  --surface: #fffdf6;
+  --page: #f3eddf;
+  --focus: #b77c55;
   font-synthesis: none;
   color-scheme: light;
   font-optical-sizing: auto;
@@ -21,7 +21,18 @@
 }
 
 * { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; min-height: 100vh; }
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--page);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 31px,
+    rgba(143, 164, 157, 0.13) 32px
+  );
+}
 button, input { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
