@@ -1,0 +1,133 @@
+.browse {
+  padding-top: 40px;
+}
+
+.browse h1 {
+  margin: 0 0 20px;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+}
+
+.browse-row {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.browse-search {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-inline: 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink-soft);
+}
+
+.browse-search:focus-within,
+.browse-school select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.browse-search .icon {
+  flex: none;
+}
+
+.browse-search input {
+  flex: 1;
+  min-width: 0;
+  height: 46px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.browse-school select {
+  height: 48px;
+  padding-inline: 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background-color: var(--surface);
+  color: var(--ink);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  flex: none;
+  min-height: 38px;
+  padding: 6px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.chip:hover {
+  border-color: var(--ink-faint);
+}
+
+.chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.browse-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 28px;
+  margin: 22px 0 14px;
+  color: var(--ink-soft);
+}
+
+.browse-summary p {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .browse {
+    padding-top: 24px;
+  }
+
+  .browse-row {
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .browse-school select {
+    width: 100%;
+  }
+
+  /* One swipeable row keeps results on screen, running edge to edge past the page gutter. */
+  .chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-inline: calc(var(--gutter) * -1);
+    padding-inline: var(--gutter);
+    scrollbar-width: none;
+  }
+
+  .chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  .browse-summary {
+    margin-top: 16px;
+  }
+}

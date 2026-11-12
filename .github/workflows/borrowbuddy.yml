@@ -1,0 +1,111 @@
+name: BorrowBuddy
+
+# Checks every pull request that touches BorrowBuddy, and deploys to Firebase
+# (Firestore rules + Hosting) once those changes land on main.
+on:
+  pull_request:
+    paths:
+      - 'BorrowBuddy/**'
+      - '.github/workflows/borrowbuddy.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'BorrowBuddy/**'
+      - '.github/workflows/borrowbuddy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # Pull requests cancel their own outdated runs; deploys from main always finish in order.
+  group: borrowbuddy-${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  FIREBASE_TOOLS_VERSION: 15.31.0
+
+defaults:
+  run:
+    working-directory: BorrowBuddy
+
+jobs:
+  check:
+    name: Lint, test, and build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: BorrowBuddy/package-lock.json
+
+      # The Firestore emulator used by the rules tests needs Java 21 or newer.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Firebase emulators
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS_VERSION }}
+
+      - run: npm ci
+      - run: npm install --global firebase-tools@${{ env.FIREBASE_TOOLS_VERSION }}
+
+      - run: npm run lint
+      - run: npm test
+      - name: Test Firestore security rules
+        run: npm run test:rules
+      - run: npm run build
+
+  deploy:
+    name: Deploy to Firebase
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment:
+      name: firebase-production
+      url: https://borrowbuddy-cs392.web.app
+    steps:
+      - name: Check for deploy credentials
+        id: credentials
+        # Runs before checkout, so BorrowBuddy/ doesn't exist yet.
+        working-directory: .
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BORROWBUDDY }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::warning::FIREBASE_SERVICE_ACCOUNT_BORROWBUDDY is not set, so nothing was deployed."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.credentials.outputs.ready == 'true'
+
+      - uses: actions/setup-node@v7
+        if: steps.credentials.outputs.ready == 'true'
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: BorrowBuddy/package-lock.json
+
+      - uses: google-github-actions/auth@v3
+        if: steps.credentials.outputs.ready == 'true'
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BORROWBUDDY }}
+
+      - run: npm ci
+        if: steps.credentials.outputs.ready == 'true'
+      - run: npm run build
+        if: steps.credentials.outputs.ready == 'true'
+
+      - name: Deploy rules and site
+        if: steps.credentials.outputs.ready == 'true'
+        run: npx --yes firebase-tools@${{ env.FIREBASE_TOOLS_VERSION }} deploy --only firestore:rules,hosting --project borrowbuddy-cs392 --non-interactive

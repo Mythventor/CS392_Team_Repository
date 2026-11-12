@@ -1,8 +1,16 @@
 {
+<<<<<<< HEAD
   "database": {
     "rules": "database.rules.json"
   },
   "hosting": {
+=======
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "hosting": {
+    "site": "qrise-cs392",
+>>>>>>> 26ce73e83a285273d0ade50f5abe4a41945b6f67
     "public": "dist",
     "ignore": [
       "firebase.json",

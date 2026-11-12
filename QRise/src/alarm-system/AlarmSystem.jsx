@@ -3,6 +3,13 @@ import { AlarmScheduler } from './scheduler';
 import { AlarmSound } from './sound';
 import { displayTime } from '../alarms/model';
 import { QR_MISMATCH_LIMIT, recordMismatchAttempt } from './verification';
+import {
+  closeAlarmNotifications,
+  notificationPermission,
+  registerNotificationWorker,
+  requestNotificationPermission,
+  showAlarmNotification,
+} from './notifications';
 import './AlarmSystem.css';
 
 // scanAndVerify({ alarm, signal }) must resolve to literal true only for a valid QR.
@@ -14,6 +21,7 @@ export default function AlarmSystem({ alarms, onOneShotFired, onFailsafe, scanAn
   const [audioError, setAudioError] = useState('');
   const [scanMessage, setScanMessage] = useState('');
   const [scanning, setScanning] = useState(false);
+  const [notifyPermission, setNotifyPermission] = useState(() => notificationPermission());
   const dialog = useRef(null);
   const video = useRef(null);
   const scanController = useRef(null);
@@ -29,6 +37,10 @@ export default function AlarmSystem({ alarms, onOneShotFired, onFailsafe, scanAn
       try { sound.start(); }
       catch (error) { setAudioError(error.message); }
       setQueue(previous => [...previous, ...due]);
+      due.forEach(alarm => {
+        const { clock, period } = displayTime(alarm.time);
+        showAlarmNotification(alarm, `${clock} ${period}`).catch(() => {});
+      });
       const once = due.filter(alarm => !alarm.days.length).map(alarm => alarm.id);
       if (once.length) onOneShotFired?.(once);
     }
@@ -46,8 +58,15 @@ export default function AlarmSystem({ alarms, onOneShotFired, onFailsafe, scanAn
   useEffect(() => {
     if (!ringing) return;
     dialog.current.showModal();
-    return () => sound.stop();
+    return () => {
+      sound.stop();
+      closeAlarmNotifications().catch(() => {});
+    };
   }, [ringing, sound]);
+
+  useEffect(() => {
+    if (notifyPermission === 'granted') registerNotificationWorker().catch(() => {});
+  }, [notifyPermission]);
 
   useEffect(() => () => {
     scanController.current?.abort();
@@ -61,6 +80,11 @@ export default function AlarmSystem({ alarms, onOneShotFired, onFailsafe, scanAn
       setAudioReady(true);
       setAudioError('');
     } catch (error) { setAudioError(error.message); }
+  }
+
+  async function enableNotifications() {
+    try { setNotifyPermission(await requestNotificationPermission()); }
+    catch { setNotifyPermission(notificationPermission()); }
   }
 
   async function verify() {
@@ -111,6 +135,12 @@ export default function AlarmSystem({ alarms, onOneShotFired, onFailsafe, scanAn
   return <section className="alarm-system" aria-label="Alarm system">
     <button className="secondary" onClick={enableSound}>Enable alarm sound</button>
     <p role="status">{audioReady ? 'Alarm sound enabled for this session.' : 'Enable sound before leaving an alarm set.'}</p>
+    {notifyPermission === 'default' && <button className="secondary" onClick={enableNotifications}>Enable notifications</button>}
+    <p role="status">{{
+      granted: 'Notifications are on. You will also get a notification when an alarm rings while QRise is in the background.',
+      denied: 'Notifications are blocked. Allow them for this site in your browser settings to get alarm notifications.',
+      unsupported: 'This browser does not support notifications. On iPhone, add QRise to your Home Screen first.',
+    }[notifyPermission] ?? 'Turn on notifications to be alerted when an alarm rings while QRise is in the background.'}</p>
     <p>Keep QRise open and your device awake. This web preview cannot reliably ring while the browser is closed or your phone is locked.</p>
     {!ringing && audioError && <p role="alert">{audioError}</p>}
     {!ringing && scanMessage && <p role="status">{scanMessage}</p>}

@@ -1,0 +1,203 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isUser(uid) { return signedIn() && request.auth.uid == uid; }
+    function textUpTo(value, max) { return value is string && value.size() <= max; }
+
+    function validProfile(data) {
+      return data.keys().hasOnly(['displayName', 'photoURL', 'school', 'bio', 'createdAt', 'updatedAt'])
+        && data.keys().hasAll(['displayName', 'school', 'bio'])
+        && textUpTo(data.displayName, 60)
+        && textUpTo(data.school, 40)
+        && textUpTo(data.bio, 280)
+        && (!('photoURL' in data) || data.photoURL == null || textUpTo(data.photoURL, 2048));
+    }
+
+    function validItem(data) {
+      return data.title is string && data.title.size() > 0 && data.title.size() <= 80
+        && textUpTo(data.category, 40)
+        && textUpTo(data.school, 40)
+        && data.status in ['available', 'reserved', 'sold', 'unavailable']
+        && (!('price' in data) || (data.price is int && data.price >= 0 && data.price <= 10000))
+        && (!('reservedFor' in data) || data.reservedFor == null || textUpTo(data.reservedFor, 64))
+        && (!('description' in data) || textUpTo(data.description, 2000))
+        && (!('pickupArea' in data) || textUpTo(data.pickupArea, 120))
+        && (!('condition' in data) || data.condition in ['Like new', 'Good', 'Fair'])
+        && (!('photoURL' in data) || textUpTo(data.photoURL, 2048))
+        && (!('photoPublicId' in data) || textUpTo(data.photoPublicId, 512))
+        && (!('photoPath' in data) || data.photoPath == '' || data.photoPath.matches('items/' + request.auth.uid + '/.*'))
+        && (!('availableFrom' in data) || data.availableFrom.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'))
+        && (!('availableTo' in data) || data.availableTo.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'))
+        && (!('availableFrom' in data) || !('availableTo' in data) || data.availableFrom <= data.availableTo)
+        && (!('archived' in data) || (data.archived is bool && (!data.archived || data.status == 'unavailable')));
+    }
+
+    // ----- Buying and selling (see src/deals/offers.js) -----
+
+    function participant(deal) {
+      return signedIn() && (deal.sellerId == request.auth.uid || deal.buyerId == request.auth.uid);
+    }
+    function isSellerOf(deal) { return signedIn() && deal.sellerId == request.auth.uid; }
+    function isBuyerOf(deal) { return signedIn() && deal.buyerId == request.auth.uid; }
+    function onlyChanges(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+    function moves(from, to) {
+      return resource.data.status == from && request.resource.data.status == to
+        && request.resource.data.updatedAt == request.time;
+    }
+    function itemAfter(itemId) {
+      return getAfter(/databases/$(database)/documents/items/$(itemId)).data;
+    }
+    function offerAfter(offerId) {
+      return getAfter(/databases/$(database)/documents/offers/$(offerId)).data;
+    }
+    function offerIs(offerId, itemId, status) {
+      let deal = offerAfter(offerId);
+      return deal.itemId == itemId && deal.status == status;
+    }
+
+    // An item's status changes only along with its deal, so it can never be promised
+    // to two buyers: only an available item can become reserved, and only for an
+    // accepted offer on it.
+    function itemStatusChange(itemId) {
+      let before = resource.data.status;
+      let after = request.resource.data.status;
+      let held = request.resource.data.get('reservedFor', null);
+      let wasHeld = resource.data.get('reservedFor', null);
+      return (before == after && held == wasHeld)
+        || (before in ['available', 'unavailable'] && after in ['available', 'unavailable'] && held == null)
+        || (before == 'available' && after == 'reserved' && held is string && offerIs(held, itemId, 'accepted'))
+        || (before == 'reserved' && after == 'available' && held == null && wasHeld is string
+            && offerIs(wasHeld, itemId, 'cancelled'))
+        || (before == 'reserved' && after == 'sold' && held == wasHeld && wasHeld is string
+            && offerIs(wasHeld, itemId, 'sold'));
+    }
+    // A buyer who cancels an accepted deal puts the item back on sale, and changes nothing else.
+    function buyerReleases(itemId) {
+      let wasHeld = resource.data.get('reservedFor', null);
+      return resource.data.status == 'reserved' && wasHeld is string
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'reservedFor', 'updatedAt'])
+        && request.resource.data.status == 'available' && request.resource.data.reservedFor == null
+        && offerAfter(wasHeld).buyerId == request.auth.uid
+        && offerIs(wasHeld, itemId, 'cancelled');
+    }
+
+    // A new offer: at or below the asking price, on someone else's available item.
+    function validNewOffer(data) {
+      let item = get(/databases/$(database)/documents/items/$(data.itemId)).data;
+      return data.keys().hasOnly(['itemId', 'itemTitle', 'itemPhotoURL', 'sellerId', 'sellerName', 'buyerId',
+          'buyerName', 'listPrice', 'offerPrice', 'message', 'status', 'createdAt', 'updatedAt'])
+        && data.buyerId == request.auth.uid
+        && data.sellerId != request.auth.uid
+        && data.status == 'pending'
+        && data.createdAt == request.time && data.updatedAt == request.time
+        && textUpTo(data.message, 500)
+        && textUpTo(data.itemTitle, 80) && textUpTo(data.itemPhotoURL, 2048)
+        && textUpTo(data.sellerName, 60) && textUpTo(data.buyerName, 60)
+        && item.ownerId == data.sellerId
+        && item.status == 'available'
+        && item.get('archived', false) == false
+        && data.listPrice == item.price
+        && data.offerPrice is int && data.offerPrice >= 0 && data.offerPrice <= item.price;
+    }
+
+    function validPickupPlan(plan) {
+      return plan.keys().hasOnly(['place', 'time', 'note', 'proposedBy', 'confirmedBy'])
+        && plan.place is string && plan.place.size() > 0 && plan.place.size() <= 120
+        && plan.time is string && plan.time.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$')
+        && textUpTo(plan.note, 200);
+    }
+    // Either person proposes a plan; only the other person can confirm it, unchanged.
+    function pickupChange() {
+      let plan = request.resource.data.pickup;
+      let old = resource.data.get('pickup', null);
+      return resource.data.status == 'accepted'
+        && onlyChanges(['pickup', 'updatedAt'])
+        && request.resource.data.updatedAt == request.time
+        && validPickupPlan(plan)
+        && (
+          (plan.proposedBy == request.auth.uid && plan.confirmedBy == null)
+          || (old != null && plan.confirmedBy == request.auth.uid && old.proposedBy != request.auth.uid
+              && plan.place == old.place && plan.time == old.time && plan.note == old.note
+              && plan.proposedBy == old.proposedBy)
+        );
+    }
+
+    function statusChange(offerId) {
+      let deal = resource.data;
+      let next = request.resource.data;
+      return (
+        // Seller accepts: the item must be reserved for this offer in the same write.
+        (isSellerOf(deal) && moves('pending', 'accepted') && onlyChanges(['status', 'acceptedAt', 'updatedAt'])
+          && next.acceptedAt == request.time
+          && itemAfter(deal.itemId).status == 'reserved' && itemAfter(deal.itemId).reservedFor == offerId)
+        || (isSellerOf(deal) && moves('pending', 'declined')
+          && onlyChanges(['status', 'declinedAt', 'declineReason', 'updatedAt'])
+          && next.declinedAt == request.time && textUpTo(next.get('declineReason', ''), 200))
+        // The buyer can withdraw a pending offer.
+        || (isBuyerOf(deal) && moves('pending', 'cancelled')
+          && onlyChanges(['status', 'cancelledAt', 'cancelledBy', 'updatedAt'])
+          && next.cancelledAt == request.time && next.cancelledBy == request.auth.uid)
+        // Either person can call off an accepted deal; the item goes back on sale in the same write.
+        || (participant(deal) && moves('accepted', 'cancelled')
+          && onlyChanges(['status', 'cancelledAt', 'cancelledBy', 'updatedAt'])
+          && next.cancelledAt == request.time && next.cancelledBy == request.auth.uid
+          && itemAfter(deal.itemId).get('reservedFor', null) != offerId)
+        // Only the seller marks it sold, and the item is marked sold with it.
+        || (isSellerOf(deal) && moves('accepted', 'sold')
+          && onlyChanges(['status', 'soldAt', 'updatedAt']) && next.soldAt == request.time
+          && itemAfter(deal.itemId).status == 'sold')
+      );
+    }
+
+    // Profiles are visible to signed-in students. Only the owner can change theirs.
+    match /users/{uid} {
+      allow read: if signedIn();
+      allow create: if isUser(uid) && validProfile(request.resource.data);
+      allow update: if isUser(uid)
+        && validProfile(request.resource.data)
+        && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    // Anyone can browse items. Only the owner can change or remove a listing.
+    match /items/{itemId} {
+      allow read: if true;
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.status in ['available', 'unavailable']
+        && request.resource.data.get('reservedFor', null) == null
+        && validItem(request.resource.data);
+      allow update: if signedIn()
+        && resource.data.ownerId == request.auth.uid
+        && request.resource.data.ownerId == resource.data.ownerId
+        && (!('createdAt' in resource.data) || request.resource.data.createdAt == resource.data.createdAt)
+        && validItem(request.resource.data)
+        && itemStatusChange(itemId);
+      allow update: if signedIn() && resource.data.ownerId != request.auth.uid && buyerReleases(itemId);
+      allow delete: if signedIn() && resource.data.ownerId == request.auth.uid
+        && resource.data.status != 'reserved';
+    }
+
+    match /offers/{offerId} {
+      allow read: if participant(resource.data);
+      allow create: if signedIn() && validNewOffer(request.resource.data);
+      allow update: if participant(resource.data) && (statusChange(offerId) || pickupChange());
+      // Offers are kept as a record of the sale.
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if participant(get(/databases/$(database)/documents/offers/$(offerId)).data);
+        allow create: if participant(get(/databases/$(database)/documents/offers/$(offerId)).data)
+          && request.resource.data.keys().hasOnly(['senderId', 'senderName', 'text', 'createdAt'])
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 1000
+          && textUpTo(request.resource.data.senderName, 60)
+          && request.resource.data.createdAt == request.time;
+      }
+    }
+  }
+}

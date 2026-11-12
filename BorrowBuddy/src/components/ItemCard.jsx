@@ -1,0 +1,50 @@
+import { Link } from "react-router-dom";
+import { formatPrice } from "../deals/model";
+import { categoryLabel, schoolLabel } from "../items/model";
+import { Icon } from "./icons";
+import "./ItemCard.css";
+
+export function ItemCard({ item }) {
+  const school = schoolLabel(item.school);
+  return (
+    <article className="item-card">
+      <Link to={`/items/${item.id}`} className="item-card-link">
+        <div className="item-card-media" data-category={item.category}>
+          {item.photoURL
+            ? <img src={item.photoURL} alt="" loading="lazy" />
+            : <Icon name={item.category} size={44} />}
+        </div>
+        <div className="item-card-body">
+          <div className="item-card-top">
+            <p className="item-card-category">{categoryLabel(item.category) || "Other"}</p>
+            {Number.isInteger(item.price) && <p className="item-card-price">{formatPrice(item.price)}</p>}
+          </div>
+          <h3>{item.title}</h3>
+          {school && (
+            <p className="item-card-meta">
+              <Icon name="pin" size={15} />
+              <span>{school}</span>
+            </p>
+          )}
+          {item.ownerName && <p className="item-card-owner">Sold by {item.ownerName}</p>}
+        </div>
+      </Link>
+    </article>
+  );
+}
+
+export function ItemGridSkeleton({ count = 4 }) {
+  return (
+    <div className="item-grid" aria-hidden="true">
+      {Array.from({ length: count }, (_, index) => (
+        <div className="item-card item-card-skeleton" key={index}>
+          <div className="item-card-media" />
+          <div className="item-card-body">
+            <span />
+            <span />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
