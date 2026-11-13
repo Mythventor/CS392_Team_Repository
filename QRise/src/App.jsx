@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
 import {
   createUserWithEmailAndPassword,
-  deleteUser,
   EmailAuthProvider,
   onAuthStateChanged,
   reauthenticateWithCredential,
@@ -16,7 +15,8 @@ import {
 import { get, onValue, push, ref, update } from "@firebase/database";
 import { auth, database, firebaseConfigError } from "./firebase";
 import { usernameToAuthEmail, validateUsername } from "./username";
-import { classAttendanceStatus } from "./classAttendance";
+import { classAttendanceStatus, classMinutesLate } from "./classAttendance";
+import { attendanceSessionForClass, formatMeetingTime, meetingDaysLabel, selectedMeetingDays } from "./classSchedule";
 import "./App.css";
 
 const APP_PAGES = new Set(["home", "classes", "account"]);
@@ -90,6 +90,14 @@ function Navigation({ page, onNavigate }) {
         </button>
       ))}
     </nav>
+  );
+}
+
+function FeedbackFooter({ className = "" }) {
+  return (
+    <footer className={`app-footer ${className}`.trim()}>
+      <a href="https://forms.gle/gu3r7aftXa8bx3eQ9" target="_blank" rel="noreferrer">Feedback</a>
+    </footer>
   );
 }
 
@@ -172,6 +180,7 @@ function WelcomePage({ view, setView, onSubmit, onGuest, busy, error, available 
           />
         )}
       </section>
+      <FeedbackFooter />
     </main>
   );
 }
@@ -183,6 +192,7 @@ function StudentMessage({ title, message }) {
         <h1>{title}</h1>
         {message && <p>{message}</p>}
       </section>
+      <FeedbackFooter />
     </main>
   );
 }
@@ -240,11 +250,22 @@ function StudentCheckInPage({ authStatus, user }) {
       const newCheckIn = push(ref(database, `checkins/${classId}`));
       if (!newCheckIn.key) throw new Error("Firebase did not create an attendance record ID.");
       const checkedInAt = Date.now();
+      const checkedInTime = new Intl.DateTimeFormat("en-GB", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23",
+        timeZone: classInfo?.timeZone || undefined,
+      }).format(checkedInAt);
+      const sessionId = attendanceSessionForClass({ ...classInfo, id: classId }, checkedInAt).sessionId;
+      if (!sessionId) {
+        throw new Error("This class's recurring schedule is incomplete. Ask your instructor to update its settings.");
+      }
       const checkInRecord = {
         name: student.name.trim(),
         studentId: student.studentId.trim(),
         status: "Present",
-        checkedInAt,
+        checkedInTime,
+        sessionId,
         arrivalStatus: classAttendanceStatus(
           checkedInAt,
           classInfo?.meetingTime,
@@ -278,7 +299,6 @@ function StudentCheckInPage({ authStatus, user }) {
       <section className="student-sheet" aria-labelledby="student-checkin-title">
         <p className="student-class">{classInfo?.name}</p>
         <h1 id="student-checkin-title">Check in</h1>
-        {classInfo?.prompt && <p className="student-prompt">{classInfo.prompt}</p>}
         <form className="class-form" onSubmit={submitCheckIn}>
           <label>
             Name
@@ -302,6 +322,7 @@ function StudentCheckInPage({ authStatus, user }) {
           </label>
           {classInfo?.prompt && (
             <label>
+              <span className="student-prompt">{classInfo.prompt}</span>
               Your response{classInfo.requireDiscussionResponse ? " (required)" : " (optional)"}
               <textarea
                 value={discussionResponse}
@@ -315,6 +336,7 @@ function StudentCheckInPage({ authStatus, user }) {
         </form>
         {error && <p className="firebase-error" role="alert">{error}</p>}
       </section>
+      <FeedbackFooter />
     </main>
   );
 }
@@ -368,6 +390,7 @@ function ClassWorkspace({
   onUpdateClass,
   onDeleteClass,
   onRefreshCode,
+  onRotateAttendance,
   onError,
   onCreateAccount,
   onEndGuest,
@@ -383,12 +406,43 @@ function ClassWorkspace({
   const [creatingClass, setCreatingClass] = useState(false);
   const [guestClassCreated, setGuestClassCreated] = useState(false);
   const [qrResult, setQrResult] = useState({ value: "", image: "", error: "" });
-  const [settings, setSettings] = useState(false);
-  const [attendanceOpen, setAttendanceOpen] = useState(false);
-  const classRecords = records.filter((record) => record.classId === selectedClassId);
+  const [activePanel, setActivePanel] = useState(null);
+  const [recurringEnabled, setRecurringEnabled] = useState(Boolean(selectedClass?.recurring));
+  const [now, setNow] = useState(Date.now);
+  const rotatedSession = useRef("");
+  const attendanceSession = selectedClass ? attendanceSessionForClass(selectedClass, now) : null;
+  const activeSessionId = attendanceSession?.sessionId || "";
+  const classRecords = records.filter((record) => (
+    record.classId === selectedClassId
+    && (
+      !selectedClass?.recurring
+      || (attendanceSession?.clearsAt && now < attendanceSession.clearsAt)
+      || record.sessionId === activeSessionId
+    )
+  ));
   const checkInUrl = selectedClass?.sessionCode ? buildCheckInUrl(selectedClass) : "";
   const qrImage = qrResult.value === checkInUrl ? qrResult.image : "";
   const qrError = qrResult.value === checkInUrl ? qrResult.error : "";
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 15000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    if (
+      !selectedClass?.recurring
+      || !activeSessionId
+      || selectedClass.attendanceSessionId === activeSessionId
+    ) return;
+    const rotationKey = `${selectedClass.id}:${activeSessionId}`;
+    if (rotatedSession.current === rotationKey) return;
+    rotatedSession.current = rotationKey;
+    onRotateAttendance(selectedClass, activeSessionId).catch((rotationError) => {
+      rotatedSession.current = "";
+      onError(databaseErrorMessage(rotationError, "prepare attendance for the next class meeting"));
+    });
+  }, [selectedClass, activeSessionId, now, onRotateAttendance, onError]);
 
   const endGuestSession = async () => {
     const confirmed = window.confirm(
@@ -419,19 +473,28 @@ function ClassWorkspace({
     if (!selectedClass) return;
     const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
     const rows = [
-      ["name", "studentId", "class", "status", "checkedInAt", "arrivalStatus", "discussionResponse"],
+      ["name", "studentId", "class", "status", "checkedInTime", "arrivalStatus", "discussionResponse"],
       ...classRecords.map((record) => [
         record.name,
         record.studentId,
         selectedClass.name,
         record.status,
-        new Date(record.checkedInAt).toISOString(),
-        record.arrivalStatus || classAttendanceStatus(
-          record.checkedInAt,
-          selectedClass.meetingTime,
-          selectedClass.graceMinutes ?? 5,
-          selectedClass.timeZone,
-        ),
+        record.checkedInTime || (record.checkedInAt
+          ? new Intl.DateTimeFormat("en-GB", {
+              hour: "2-digit",
+              minute: "2-digit",
+              hourCycle: "h23",
+              timeZone: selectedClass.timeZone || undefined,
+            }).format(record.checkedInAt)
+          : ""),
+        record.arrivalStatus || (record.checkedInAt
+          ? classAttendanceStatus(
+              record.checkedInAt,
+              selectedClass.meetingTime,
+              selectedClass.graceMinutes ?? 5,
+              selectedClass.timeZone,
+            )
+          : "Unknown"),
         record.discussionResponse || "",
       ]),
     ];
@@ -445,7 +508,7 @@ function ClassWorkspace({
   };
 
   return (
-    <main className="guest-main">
+    <main className={`guest-main${activePanel ? " has-panel" : ""}`}>
       {user.isAnonymous && (
         <header className="guest-heading guest-session-heading">
           <div>
@@ -463,6 +526,7 @@ function ClassWorkspace({
       )}
 
       <section className="guest-class-panel" aria-label="Class attendance workspace">
+        {error && !guestSignup && <p className="firebase-error" role="alert">{error}</p>}
         {guestSignup ? (
           <AccountForm
             mode="signup"
@@ -481,7 +545,11 @@ function ClassWorkspace({
               className={`class-tab${classItem.id === selectedClassId ? " is-selected" : ""}`}
               type="button"
               aria-pressed={classItem.id === selectedClassId}
-              onClick={() => { onSelectClass(classItem.id); setSettings(false); }}
+              onClick={() => {
+                onSelectClass(classItem.id);
+                setRecurringEnabled(Boolean(classItem.recurring));
+                setActivePanel(null);
+              }}
             >
               {classItem.name}
             </button>
@@ -528,178 +596,247 @@ function ClassWorkspace({
           <>
             <div className="qr-class-heading">
               <h2>{selectedClass.name}</h2>
-              {selectedClass.meetingTime && <span>{selectedClass.meetingTime}</span>}
+              <p>
+                {selectedClass.recurring && `${meetingDaysLabel(selectedClass.meetingDays)} · `}
+                {formatMeetingTime(selectedClass.meetingTime)}
+              </p>
             </div>
-            <div className="qr-display" aria-live="polite">
-              {qrImage && <img className="qr-image" src={qrImage} alt={`Check-in QR code for ${selectedClass.name}`} />}
-              {!qrImage && !qrError && <p>Generating QR code…</p>}
-              {qrError && <p className="firebase-error" role="alert">{qrError}</p>}
-            </div>
-            <div className="qr-actions">
-              <button
-                className="secondary"
-                type="button"
-                onClick={async () => {
-                  try {
-                    await onRefreshCode(selectedClass);
-                  } catch (refreshError) {
-                    onError(databaseErrorMessage(refreshError, "refresh the QR code"));
-                  }
-                }}
-              >
-                Refresh code
-              </button>
-              <button className="secondary" type="button" disabled={!qrImage} onClick={() => window.open(qrImage, "_blank", "noopener,noreferrer")}>
-                Open QR in new tab
-              </button>
-              <button className="secondary" type="button" onClick={() => setSettings((open) => !open)} aria-expanded={settings}>
-                {settings ? "Close settings" : "Class settings"}
-              </button>
-            </div>
-
-            {settings && (
-              <form
-                className="class-settings"
-                onSubmit={async (event) => {
-                  event.preventDefault();
-                  try {
-                    const prompt = event.currentTarget.elements.namedItem("prompt").value.trim();
-                    const requireDiscussionResponse = event.currentTarget.elements.namedItem("requireDiscussionResponse").checked;
-                    const graceEnabled = event.currentTarget.elements.namedItem("graceEnabled").checked;
-                    const graceValue = Number(event.currentTarget.elements.namedItem("graceMinutes").value);
-                    if (requireDiscussionResponse && !prompt) {
-                      throw new Error("Add a discussion prompt before requiring students to answer it.");
-                    }
-                    if (graceEnabled && (!Number.isInteger(graceValue) || graceValue < 1 || graceValue > 60)) {
-                      throw new Error("Set the grace period to a whole number from 1 to 60 minutes, or turn it off.");
-                    }
-                    await onUpdateClass(selectedClass.id, {
-                      name: event.currentTarget.elements.namedItem("className").value.trim(),
-                      meetingTime: event.currentTarget.elements.namedItem("meetingTime").value,
-                      prompt,
-                      requireDiscussionResponse,
-                      graceMinutes: graceEnabled ? graceValue : 0,
-                    });
-                    setSettings(false);
-                  } catch (updateError) {
-                    onError(databaseErrorMessage(updateError, "save class settings"));
-                  }
-                }}
-              >
-                <label>
-                  Class name
-                  <input name="className" defaultValue={selectedClass.name} maxLength={100} required />
-                </label>
-                <label>
-                  Meeting time
-                  <input name="meetingTime" type="time" defaultValue={selectedClass.meetingTime || "09:00"} required />
-                </label>
-                <label>
-                  Discussion prompt
-                  <textarea name="prompt" defaultValue={selectedClass.prompt || ""} maxLength={300} />
-                </label>
-                <label className="setting-toggle">
-                  <input
-                    name="requireDiscussionResponse"
-                    type="checkbox"
-                    defaultChecked={Boolean(selectedClass.requireDiscussionResponse)}
-                  />
-                  Require students to answer the discussion prompt
-                </label>
-                <label className="setting-toggle">
-                  <input
-                    name="graceEnabled"
-                    type="checkbox"
-                    defaultChecked={(selectedClass.graceMinutes ?? 5) > 0}
-                  />
-                  Allow a grace period after the meeting time
-                </label>
-                <label>
-                  Grace period (minutes)
-                  <input
-                    name="graceMinutes"
-                    type="number"
-                    min="1"
-                    max="60"
-                    defaultValue={selectedClass.graceMinutes ?? 5}
-                  />
-                  <span className="account-hint">Uncheck the grace-period option to mark check-ins late immediately after the meeting time.</span>
-                </label>
-                <div className="settings-actions">
-                  <button className="primary" type="submit">Save settings</button>
+            <div className={`qr-workspace${activePanel ? " with-panel" : ""}`}>
+              <div className="qr-display" aria-live="polite">
+                {qrImage && <img className="qr-image" src={qrImage} alt={`Check-in QR code for ${selectedClass.name}`} />}
+                {!qrImage && !qrError && <p>Generating QR code…</p>}
+                {qrError && <p className="firebase-error" role="alert">{qrError}</p>}
+              </div>
+              <aside className="qr-side-panel" aria-label="Class actions and responses">
+                <div className="qr-actions">
                   <button
-                    className="link-button"
+                    className="secondary"
                     type="button"
                     onClick={async () => {
                       try {
-                        await onDeleteClass(selectedClass);
-                        if (user.isAnonymous) setGuestClassCreated(false);
-                        setSettings(false);
-                      } catch (deleteError) {
-                        onError(databaseErrorMessage(deleteError, "remove the class"));
+                        await onRefreshCode(selectedClass);
+                      } catch (refreshError) {
+                        onError(databaseErrorMessage(refreshError, "refresh the QR code"));
                       }
                     }}
                   >
-                    Remove class
+                    Refresh code
+                  </button>
+                  <button className="secondary" type="button" disabled={!qrImage} onClick={() => window.open(qrImage, "_blank", "noopener,noreferrer")}>
+                    Open QR in new tab
+                  </button>
+                  <button
+                    className="secondary"
+                    type="button"
+                    onClick={() => {
+                      setRecurringEnabled(Boolean(selectedClass.recurring));
+                      setActivePanel((open) => open === "settings" ? null : "settings");
+                    }}
+                    aria-expanded={activePanel === "settings"}
+                  >
+                    {activePanel === "settings" ? "Close settings" : "Class settings"}
+                  </button>
+                  <button
+                    className="secondary"
+                    type="button"
+                    onClick={() => setActivePanel((open) => open === "responses" ? null : "responses")}
+                    aria-expanded={activePanel === "responses"}
+                  >
+                    {activePanel === "responses" ? "Hide responses" : "View responses"}
                   </button>
                 </div>
-              </form>
-            )}
-            <div className="class-export">
-              <span>{classRecords.length} check-in{classRecords.length === 1 ? "" : "s"}</span>
-              <button className="secondary" type="button" onClick={() => setAttendanceOpen(true)}>View attendance</button>
-              <button className="primary" type="button" onClick={exportClassCsv}>Export this class</button>
-            </div>
-            {attendanceOpen && (
-              <div className="attendance-backdrop" onMouseDown={(event) => {
-                if (event.target === event.currentTarget) setAttendanceOpen(false);
-              }}>
-                <section className="attendance-dialog" role="dialog" aria-modal="true" aria-labelledby="attendance-title">
-                  <header className="attendance-dialog-heading">
-                    <h2 id="attendance-title">{selectedClass.name} attendance</h2>
-                    <button className="secondary" type="button" onClick={() => setAttendanceOpen(false)}>Close</button>
-                  </header>
+                <div className="class-export">
+                  <span>{classRecords.length} response{classRecords.length === 1 ? "" : "s"}</span>
+                  <button className="primary" type="button" onClick={exportClassCsv}>Export this class</button>
+                </div>
+              </aside>
+              {activePanel === "responses" && (
+                <section className="attendance-feed workspace-drawer" aria-label={`${selectedClass.name} responses`}>
+                  <h3>Responses ({classRecords.length})</h3>
                   {classRecords.length === 0 ? (
-                    <p className="empty-class">No one has checked in yet.</p>
+                    <p className="attendance-empty">No one has checked in yet.</p>
                   ) : (
-                    <div className="attendance-table-wrap">
-                      <table className="attendance-table">
-                        <thead>
-                          <tr>
-                            <th>Name</th>
-                            <th>Student ID</th>
-                            <th>Checked in</th>
-                            <th>Arrival</th>
-                            {selectedClass.prompt && <th>Discussion response</th>}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {classRecords.map((record) => (
-                            <tr key={record.id}>
-                              <td>{record.name}</td>
-                              <td>{record.studentId}</td>
-                              <td>{new Date(record.checkedInAt).toLocaleString()}</td>
-                              <td>{record.arrivalStatus || classAttendanceStatus(
-                                record.checkedInAt,
-                                selectedClass.meetingTime,
-                                selectedClass.graceMinutes ?? 5,
-                                selectedClass.timeZone,
-                              )}</td>
-                              {selectedClass.prompt && <td>{record.discussionResponse || "—"}</td>}
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <ol>
+                      {[...classRecords].sort((a, b) => (
+                        String(b.checkedInTime ?? "").localeCompare(String(a.checkedInTime ?? ""))
+                      )).map((record) => {
+                        const checkedInTime = record.checkedInTime || (record.checkedInAt
+                          ? new Intl.DateTimeFormat("en-GB", {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              hourCycle: "h23",
+                              timeZone: selectedClass.timeZone || undefined,
+                            }).format(record.checkedInAt)
+                          : "");
+                        const arrivalStatus = record.arrivalStatus || (record.checkedInAt
+                          ? classAttendanceStatus(
+                              record.checkedInAt,
+                              selectedClass.meetingTime,
+                              selectedClass.graceMinutes ?? 5,
+                              selectedClass.timeZone,
+                            )
+                          : "Unknown");
+                        const minutesLate = classMinutesLate(checkedInTime, selectedClass.meetingTime);
+                        return (
+                          <li key={record.id}>
+                            <div className="attendance-feed-person">
+                              <strong>{record.name}</strong>
+                              <span>{record.studentId}</span>
+                            </div>
+                            <div className="attendance-feed-meta">
+                              <time>{checkedInTime || "Time unavailable"}</time>
+                              <span>{arrivalStatus === "Late" && minutesLate !== null
+                                ? `Late · ${minutesLate} ${minutesLate === 1 ? "minute" : "minutes"}`
+                                : arrivalStatus}</span>
+                            </div>
+                            {selectedClass.prompt && (
+                              <p className="attendance-feed-response">
+                                {record.discussionResponse || "No response"}
+                              </p>
+                            )}
+                          </li>
+                        );
+                      })}
+                    </ol>
                   )}
                 </section>
-              </div>
-            )}
+              )}
+              {activePanel === "settings" && (
+                <form
+                  className="class-settings workspace-drawer"
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    try {
+                      const prompt = event.currentTarget.elements.namedItem("prompt").value.trim();
+                      const requireDiscussionResponse = event.currentTarget.elements.namedItem("requireDiscussionResponse").checked;
+                      const graceEnabled = event.currentTarget.elements.namedItem("graceEnabled").checked;
+                      const graceValue = Number(event.currentTarget.elements.namedItem("graceMinutes").value);
+                      const meetingDays = [...event.currentTarget.querySelectorAll('input[name="meetingDay"]:checked')]
+                        .map((input) => Number(input.value))
+                        .sort((a, b) => a - b);
+                      if (requireDiscussionResponse && !prompt) {
+                        throw new Error("Add a discussion prompt before requiring students to answer it.");
+                      }
+                      if (graceEnabled && (!Number.isInteger(graceValue) || graceValue < 1 || graceValue > 60)) {
+                        throw new Error("Set the grace period to a whole number from 1 to 60 minutes, or turn it off.");
+                      }
+                      if (recurringEnabled && !meetingDays.length) {
+                        throw new Error("Select at least one meeting day for a recurring class.");
+                      }
+                      await onUpdateClass(selectedClass.id, {
+                        name: event.currentTarget.elements.namedItem("className").value.trim(),
+                        meetingTime: event.currentTarget.elements.namedItem("meetingTime").value,
+                        prompt,
+                        requireDiscussionResponse,
+                        graceMinutes: graceEnabled ? graceValue : 0,
+                        recurring: recurringEnabled,
+                        meetingDays: meetingDays.join(","),
+                      });
+                      setActivePanel(null);
+                    } catch (updateError) {
+                      onError(databaseErrorMessage(updateError, "save class settings"));
+                    }
+                  }}
+                >
+                  <label>
+                    Class name
+                    <input name="className" defaultValue={selectedClass.name} maxLength={100} required />
+                  </label>
+                  <label>
+                    Meeting time
+                    <input name="meetingTime" type="time" defaultValue={selectedClass.meetingTime || "09:00"} required />
+                  </label>
+                  <label className="setting-toggle">
+                    <input
+                      name="recurring"
+                      type="checkbox"
+                      checked={recurringEnabled}
+                      onChange={(event) => setRecurringEnabled(event.target.checked)}
+                    />
+                    This class meets on a recurring weekly schedule
+                  </label>
+                  {recurringEnabled && (
+                    <fieldset className="meeting-days">
+                      <legend>Meeting days</legend>
+                      {[
+                        ["1", "Monday"],
+                        ["2", "Tuesday"],
+                        ["3", "Wednesday"],
+                        ["4", "Thursday"],
+                        ["5", "Friday"],
+                        ["6", "Saturday"],
+                        ["0", "Sunday"],
+                      ].map(([value, label]) => (
+                        <label className="meeting-day-option" key={value}>
+                          <input
+                            type="checkbox"
+                            name="meetingDay"
+                            value={value}
+                            defaultChecked={selectedMeetingDays(selectedClass.meetingDays).includes(Number(value))}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </fieldset>
+                  )}
+                  <label>
+                    Discussion prompt
+                    <textarea name="prompt" defaultValue={selectedClass.prompt || ""} maxLength={300} />
+                  </label>
+                  <label className="setting-toggle">
+                    <input
+                      name="requireDiscussionResponse"
+                      type="checkbox"
+                      defaultChecked={Boolean(selectedClass.requireDiscussionResponse)}
+                    />
+                    Require students to answer the discussion prompt
+                  </label>
+                  <label className="setting-toggle">
+                    <input
+                      name="graceEnabled"
+                      type="checkbox"
+                      defaultChecked={(selectedClass.graceMinutes ?? 5) > 0}
+                    />
+                    Allow a grace period after the meeting time
+                  </label>
+                  <label>
+                    Grace period (minutes)
+                    <input
+                      name="graceMinutes"
+                      type="number"
+                      min="1"
+                      max="60"
+                      defaultValue={selectedClass.graceMinutes ?? 5}
+                    />
+                    <span className="account-hint">Uncheck the grace-period option to mark check-ins late immediately after the meeting time.</span>
+                  </label>
+                  <div className="settings-actions">
+                    <button className="primary" type="submit">Save settings</button>
+                    <button
+                      className="link-button"
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await onDeleteClass(selectedClass);
+                          if (user.isAnonymous) setGuestClassCreated(false);
+                          setActivePanel(null);
+                        } catch (deleteError) {
+                          onError(databaseErrorMessage(deleteError, "remove the class"));
+                        }
+                      }}
+                    >
+                      Remove class
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </>
         )}
           </>
         )}
       </section>
+      <FeedbackFooter />
     </main>
   );
 }
@@ -731,7 +868,7 @@ function ProfileMenu({ user, classes, onNavigate, onOpenClass }) {
   );
 }
 
-function AccountPage({ user, classes, onSaveProfile, onChangePassword, onSignOut, onOpenClass, busy, error, onError }) {
+function AccountPage({ user, onSaveProfile, onChangePassword, onSignOut, busy, error, onError }) {
   const username = user.email?.split("@")[0] || "Guest";
   const saveProfile = async (event) => {
     event.preventDefault();
@@ -774,20 +911,6 @@ function AccountPage({ user, classes, onSaveProfile, onChangePassword, onSignOut
             <p className="account-hint">Your classes are saved to this account and will be available when you sign in again.</p>
             <button className="primary" type="submit" disabled={busy}>Save profile</button>
           </form>
-          <section className="account-class-list" aria-labelledby="account-classes-title">
-            <h2 id="account-classes-title">Your classes</h2>
-            {classes.length ? (
-              <ul>
-                {classes.map((classItem) => (
-                  <li key={classItem.id}>
-                    <button className="secondary" type="button" onClick={() => onOpenClass(classItem.id)}>
-                      {classItem.name}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="account-hint">You have not created any classes yet.</p>}
-          </section>
           <form className="account-form profile-form" onSubmit={changePassword}>
             <h2>Change password</h2>
             <label>
@@ -849,6 +972,15 @@ export default function App() {
       setUser(currentUser);
       setAuthStatus("ready");
       setError("");
+      if (!currentUser) {
+        setClasses([]);
+        setRecords([]);
+        setRecordsClassId("");
+        setRecordsUid("");
+        setSelectedClassId("");
+        setClassesLoadedUid("");
+        setView("home");
+      }
     }, (authError) => {
       setError(authErrorMessage(authError, "signin"));
       setAuthStatus("error");
@@ -871,7 +1003,7 @@ export default function App() {
     }, (loadError) => {
       setError(databaseErrorMessage(loadError, "load your classes"));
       setClasses([]);
-      setClassesLoadedUid(user.uid);
+      setClassesLoadedUid("");
     });
     return unsubscribe;
   }, [user]);
@@ -991,6 +1123,7 @@ export default function App() {
       graceMinutes: 5,
       sessionCode: generateCode(),
     };
+    classItem.attendanceSessionId = attendanceSessionForClass({ ...classItem, id: classRef.key }).sessionId;
     await update(ref(database), {
       [`owners/${user.uid}/classes/${classRef.key}`]: classItem,
       [`publicClasses/${classRef.key}`]: {
@@ -1001,6 +1134,9 @@ export default function App() {
         timeZone: classItem.timeZone,
         requireDiscussionResponse: false,
         graceMinutes: 5,
+        recurring: false,
+        meetingDays: "",
+        attendanceSessionId: classItem.attendanceSessionId,
       },
       [`sessionTokens/${classRef.key}`]: { ownerUid: user.uid, code: classItem.sessionCode },
     });
@@ -1010,24 +1146,53 @@ export default function App() {
   const updateClass = async (classId, changes) => {
     const previous = classes.find((item) => item.id === classId);
     if (!previous) throw new Error("The selected class no longer exists.");
+    const timeZone = previous.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    const attendanceSessionId = attendanceSessionForClass({
+      ...previous,
+      ...changes,
+      id: classId,
+      timeZone,
+    }).sessionId || "single";
     await update(ref(database), {
       [`owners/${user.uid}/classes/${classId}`]: {
         name: changes.name,
         meetingTime: changes.meetingTime,
-        timeZone: previous.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        timeZone,
         prompt: changes.prompt,
         requireDiscussionResponse: changes.requireDiscussionResponse,
         graceMinutes: changes.graceMinutes,
+        recurring: changes.recurring,
+        meetingDays: changes.meetingDays,
         sessionCode: previous.sessionCode,
+        attendanceSessionId,
       },
       [`publicClasses/${classId}/name`]: changes.name,
       [`publicClasses/${classId}/prompt`]: changes.prompt,
       [`publicClasses/${classId}/meetingTime`]: changes.meetingTime,
-      [`publicClasses/${classId}/timeZone`]: previous.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      [`publicClasses/${classId}/timeZone`]: timeZone,
       [`publicClasses/${classId}/requireDiscussionResponse`]: changes.requireDiscussionResponse,
       [`publicClasses/${classId}/graceMinutes`]: changes.graceMinutes,
+      [`publicClasses/${classId}/recurring`]: changes.recurring,
+      [`publicClasses/${classId}/meetingDays`]: changes.meetingDays,
+      [`publicClasses/${classId}/attendanceSessionId`]: attendanceSessionId,
     });
   };
+
+  const rotateAttendanceSession = useCallback(async (classItem, sessionId) => {
+    const snapshot = await get(ref(database, `checkins/${classItem.id}`));
+    const updates = {
+      [`owners/${user.uid}/classes/${classItem.id}/attendanceSessionId`]: sessionId,
+      [`publicClasses/${classItem.id}/attendanceSessionId`]: sessionId,
+    };
+    if (classItem.attendanceSessionId && snapshot.exists()) {
+      for (const [recordId, record] of Object.entries(snapshot.val())) {
+        if (record.sessionId !== sessionId) {
+          updates[`checkins/${classItem.id}/${recordId}`] = null;
+        }
+      }
+    }
+    await update(ref(database), updates);
+  }, [user]);
 
   const refreshCode = async (classItem) => {
     const code = generateCode();
@@ -1111,7 +1276,7 @@ export default function App() {
         removals[`checkins/${classItem.id}`] = null;
       }
       if (Object.keys(removals).length) await update(ref(database), removals);
-      await deleteUser(auth.currentUser);
+      await signOut(auth);
       setView("home");
     } catch (endError) {
       throw new Error(`Could not end the guest session safely: ${endError?.message ?? "unknown error"}`, { cause: endError });
@@ -1126,7 +1291,12 @@ export default function App() {
   };
 
   if (authStatus === "loading") {
-    return <main className="welcome-page"><section className="welcome-sheet"><h1>Here!</h1><p>Connecting…</p></section></main>;
+    return (
+      <main className="welcome-page">
+        <section className="welcome-sheet"><h1>Here!</h1><p>Connecting…</p></section>
+        <FeedbackFooter />
+      </main>
+    );
   }
   if (isStudentCheckIn) return <StudentCheckInPage authStatus={authStatus} user={user} />;
   if (authStatus === "error") {
@@ -1169,6 +1339,7 @@ export default function App() {
         onUpdateClass={updateClass}
         onDeleteClass={deleteClass}
         onRefreshCode={refreshCode}
+        onRotateAttendance={rotateAttendanceSession}
         onError={setError}
         onCreateAccount={() => { setError(""); setView("signup"); }}
         onEndGuest={endGuestSession}
@@ -1191,12 +1362,17 @@ export default function App() {
           <span>QRise</span>
         </a>
         <Navigation page={page} onNavigate={navigate} />
-        <ProfileMenu
-          user={user}
-          classes={classesLoadedUid === user.uid ? classes : []}
-          onNavigate={navigate}
-          onOpenClass={openClass}
-        />
+        <div className="profile-controls">
+          <ProfileMenu
+            user={user}
+            classes={classesLoadedUid === user.uid ? classes : []}
+            onNavigate={navigate}
+            onOpenClass={openClass}
+          />
+          <button className="link-button profile-signout" type="button" onClick={handleSignOut} disabled={busy}>
+            Sign out
+          </button>
+        </div>
       </header>
       <main className="app-main" data-page={page}>
         {error && page !== "account" && <p className="firebase-error global-error" role="alert">{error}</p>}
@@ -1212,17 +1388,16 @@ export default function App() {
             onUpdateClass={updateClass}
             onDeleteClass={deleteClass}
             onRefreshCode={refreshCode}
+            onRotateAttendance={rotateAttendanceSession}
             onError={setError}
             dataLoading={classesLoadedUid !== user.uid}
           />
         ) : page === "account" ? (
           <AccountPage
             user={user}
-            classes={classesLoadedUid === user.uid ? classes : []}
             onSaveProfile={saveProfile}
             onChangePassword={changeAccountPassword}
             onSignOut={handleSignOut}
-            onOpenClass={openClass}
             busy={busy}
             error={error}
             onError={setError}
@@ -1230,7 +1405,7 @@ export default function App() {
         ) : (
           <HomeDashboard onOpenClasses={() => navigate("classes")} />
         )}
-        <footer className="app-footer">QRise · Plan a better morning</footer>
+        <FeedbackFooter />
       </main>
     </div>
   );

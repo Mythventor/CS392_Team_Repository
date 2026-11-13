@@ -36,3 +36,16 @@ export function classAttendanceStatus(checkedInAt, meetingTime, graceMinutes = 5
   const deadline = meetingTimeMinutes + grace;
   return checkInTime < meetingTimeMinutes || checkInTime <= deadline ? "On time" : "Late";
 }
+
+export function classMinutesLate(checkInTime, meetingTime) {
+  const parseMinutes = (value) => {
+    if (typeof value !== "string" || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) return null;
+    const [hours, minutes] = value.split(":").map(Number);
+    return hours * 60 + minutes;
+  };
+
+  const checkedInMinutes = parseMinutes(checkInTime);
+  const meetingMinutes = parseMinutes(meetingTime);
+  if (checkedInMinutes === null || meetingMinutes === null) return null;
+  return Math.max(0, checkedInMinutes - meetingMinutes);
+}

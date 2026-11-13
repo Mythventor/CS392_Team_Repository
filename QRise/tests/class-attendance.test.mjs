@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { classAttendanceStatus } from "../src/classAttendance.js";
+import { classAttendanceStatus, classMinutesLate } from "../src/classAttendance.js";
 
 test("class check-ins are on time through the configured grace period", () => {
   const atMeetingTime = new Date(2026, 10, 12, 9, 0).getTime();
@@ -32,4 +32,11 @@ test("invalid attendance timestamps or class meeting times are reported as unkno
   assert.equal(classAttendanceStatus("not a timestamp", "09:00", 5), "Unknown");
   assert.equal(classAttendanceStatus(Date.now(), "25:00", 5), "Unknown");
   assert.equal(classAttendanceStatus(Date.now(), "09:00", 5, "Invalid/Zone"), "Unknown");
+});
+
+test("late check-ins report minutes after the scheduled meeting time", () => {
+  assert.equal(classMinutesLate("09:00", "09:00"), 0);
+  assert.equal(classMinutesLate("09:07", "09:00"), 7);
+  assert.equal(classMinutesLate("08:55", "09:00"), 0);
+  assert.equal(classMinutesLate("invalid", "09:00"), null);
 });

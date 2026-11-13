@@ -25,8 +25,10 @@ The browser UI remains unavailable when Firebase configuration is missing. For l
 - Class settings include a meeting time, an optional discussion prompt, a toggle to require a response, and an adjustable 0–60 minute grace period. Set the grace period to zero to disable it.
 - The default grace period is five minutes. Check-ins at or before the meeting time plus grace period count as on time.
 - Meeting time and arrival status use the class's local timezone, recorded when the class is created.
+- Recurring classes can select weekly meeting days. The prior meeting's responses remain visible until 30 minutes before the next meeting; while the teacher has that class open, the app then removes older responses. If the class was closed at the cutoff, cleanup runs the next time it is opened. This is client-driven cleanup and cannot occur while no teacher client is online.
 - Students use the class QR link to submit their name and student ID. If the class requires a discussion response, the prompt and required text field are shown before submission.
-- Teachers can open the attendance list to review names, IDs, local check-in times, on-time/late status, and prompt responses; exports include the same attendance details.
+- Teachers can toggle a scrollable response feed beside the QR code and class actions; the workspace expands and stays centered when the feed opens. The feed shows names, IDs, check-in times, on-time/late status (including minutes late), and prompt responses. Exports include the attendance details. Check-ins store the time of day, not the date.
+- Recurring class headings show meeting weekdays (using “Weekdays” for Monday through Friday) and the meeting time in a.m./p.m. format. A Feedback link is available at the bottom of every page.
 - Class QR links use the Realtime Database. The old separate event check-in feature has been retired.
 
 ### Firebase setup
@@ -71,7 +73,7 @@ npm run lint
 npm run build
 ```
 
-The Playwright suite (`npm run test:e2e`) covers teacher account entry, guest class limits/settings, account conversion, and ending a guest session. It uses demo Auth and Realtime Database emulators. Install the Firebase CLI, a JDK 21 or newer, and Chromium with `npm install -g firebase-tools` and `npx playwright install chromium`. Unit tests include class attendance timing and username validation.
+The Playwright suite (`npm run test:e2e`) covers teacher account entry, guest class limits/settings, account conversion, and ending a guest session. It uses demo Auth and Realtime Database emulators. Install the Firebase CLI, a JDK 21 or newer, and Chromium with `npm install -g firebase-tools` and `npx playwright install chromium`. Unit tests include class attendance timing, recurring session boundaries, and username validation.
 
 ## Deployment
 

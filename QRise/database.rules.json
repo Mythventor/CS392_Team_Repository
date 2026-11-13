@@ -36,6 +36,15 @@
         "graceMinutes": {
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 60"
         },
+        "recurring": {
+          ".validate": "newData.isBoolean()"
+        },
+        "meetingDays": {
+          ".validate": "newData.isString() && newData.val().matches(/^([0-6](,[0-6])*)?$/)"
+        },
+        "attendanceSessionId": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 32"
+        },
         "$other": {
           ".validate": false
         }
@@ -62,7 +71,7 @@
         ".read": "auth != null && root.child('publicClasses').child($classId).child('ownerUid').val() === auth.uid",
         "$checkinId": {
           ".write": "auth != null && ((root.child('publicClasses').child($classId).child('ownerUid').val() === auth.uid) || (!data.exists() && newData.child('sessionCode').val() === root.child('sessionTokens').child($classId).child('code').val()))",
-          ".validate": "newData.hasChildren(['name', 'studentId', 'status', 'checkedInAt', 'sessionCode']) && (root.child('publicClasses').child($classId).child('requireDiscussionResponse').val() !== true || (newData.child('discussionResponse').isString() && newData.child('discussionResponse').val().length > 0))",
+          ".validate": "newData.hasChildren(['name', 'studentId', 'status', 'checkedInTime', 'sessionId', 'arrivalStatus', 'sessionCode']) && (root.child('publicClasses').child($classId).child('requireDiscussionResponse').val() !== true || (newData.child('discussionResponse').isString() && newData.child('discussionResponse').val().length > 0))",
           "name": {
             ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
           },
@@ -72,8 +81,11 @@
           "status": {
             ".validate": "newData.val() === 'Present'"
           },
-          "checkedInAt": {
-            ".validate": "newData.isNumber()"
+          "checkedInTime": {
+            ".validate": "newData.isString() && newData.val().matches(/^([01][0-9]|2[0-3]):[0-5][0-9]$/)"
+          },
+          "sessionId": {
+            ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 32"
           },
           "arrivalStatus": {
             ".validate": "newData.val() === 'On time' || newData.val() === 'Late'"

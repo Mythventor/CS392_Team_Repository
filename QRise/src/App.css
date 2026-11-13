@@ -1,9 +1,12 @@
 .welcome-page {
   min-height: 100vh;
   display: grid;
-  place-items: center;
+  grid-template-rows: 1fr auto;
+  justify-items: center;
+  align-items: center;
   padding: 24px;
 }
+.welcome-page > .app-footer { width: min(100%, 470px); }
 
 .welcome-sheet,
 .student-sheet {
@@ -158,9 +161,14 @@
 
 .guest-main {
   width: min(100% - 32px, 900px);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
   margin: 0 auto;
   padding: 36px 0;
 }
+.guest-main.has-panel { width: min(100% - 32px, 1320px); }
+.guest-main > .app-footer { width: 100%; margin-top: auto; }
 
 .guest-heading {
   display: flex;
@@ -209,7 +217,7 @@
   border-bottom: 1px dashed var(--border);
 }
 
-.app-shell { min-height: 100vh; }
+.app-shell { min-height: 100vh; display: flex; flex-direction: column; }
 .app-header {
   min-height: 76px;
   padding: 0 max(24px, calc((100vw - 1200px) / 2));
@@ -254,7 +262,8 @@
   background: var(--accent);
 }
 .nav-icon { font-size: 16px; }
-.profile-menu { position: relative; margin-left: auto; }
+.profile-controls { display: flex; align-items: center; gap: 12px; margin-left: auto; }
+.profile-menu { position: relative; }
 .profile-menu summary {
   display: flex;
   align-items: center;
@@ -297,7 +306,7 @@
 }
 .profile-menu-panel button:hover { background: #f3ead8; }
 .profile-menu-empty { padding: 5px 9px; color: var(--subtle); font-size: 12px; }
-.app-main { width: min(1200px, calc(100% - 48px)); margin: 0 auto; padding: 32px 0; }
+.app-main { width: min(1200px, calc(100% - 48px)); flex: 1; display: flex; flex-direction: column; margin: 0 auto; padding: 32px 0; }
 .welcome-card {
   min-height: 220px;
   position: relative;
@@ -334,13 +343,11 @@
 .qr-camera-preview { width: 100%; max-height: 40dvh; object-fit: cover; border-radius: 10px; background: #211b17; }
 .qr-camera-preview[hidden] { display: none; }
 .app-footer { margin-top: 32px; padding-top: 18px; border-top: 1px solid var(--border); color: var(--subtle); font-size: 11px; text-align: center; }
+.app-main > .app-footer { margin-top: auto; }
+.app-footer a { color: var(--accent-dark); font-weight: 700; text-decoration: underline; }
 .account-page { width: min(100%, 680px); min-height: 420px; margin: 0 auto; padding: 28px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
 .profile-form { max-width: 440px; margin: 24px auto; }
 .account-actions { display: flex; justify-content: center; margin-top: 24px; }
-.account-class-list { max-width: 440px; margin: 24px auto; }
-.account-class-list h2 { margin-bottom: 12px; color: var(--accent-dark); font-size: 18px; }
-.account-class-list ul { display: grid; gap: 8px; padding: 0; list-style: none; }
-.account-class-list button { width: 100%; text-align: left; }
 .profile-form h2 { color: var(--accent-dark); font-family: Georgia, "Times New Roman", serif; font-size: 20px; }
 
 .class-tab,
@@ -379,21 +386,22 @@
 }
 
 .qr-class-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 12px;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
   margin-top: 22px;
   text-align: center;
 }
 
 .qr-class-heading h2 {
+  margin: 0;
   color: var(--ink);
   font-family: Georgia, "Times New Roman", serif;
   font-size: 26px;
 }
 
-.qr-class-heading span {
+.qr-class-heading p {
+  margin: 0;
   color: var(--muted);
   font-size: 13px;
 }
@@ -448,32 +456,79 @@
 .guest-session-heading h1 { margin: 0; }
 .guest-session-heading p { max-width: 520px; margin-top: 6px; color: var(--muted); font-size: 13px; line-height: 1.5; }
 .guest-session-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 12px; }
-.attendance-backdrop {
-  position: fixed;
-  z-index: 50;
-  inset: 0;
+.qr-workspace {
   display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(37, 31, 25, 0.48);
+  grid-template-columns: minmax(0, 1.2fr) minmax(260px, 0.8fr);
+  align-items: start;
+  gap: 22px;
+  max-width: 900px;
+  width: 100%;
+  margin: 12px auto 0;
 }
-.attendance-dialog {
-  width: min(100%, 1000px);
-  max-height: min(85vh, 760px);
-  overflow: auto;
-  padding: 22px;
+.qr-workspace.with-panel {
+  grid-template-columns: minmax(260px, 1fr) minmax(220px, 0.8fr) minmax(280px, 1fr);
+  max-width: 1160px;
+  margin-top: 12px;
+}
+.qr-workspace .qr-display { width: 100%; margin: 0; }
+.qr-side-panel { min-width: 0; }
+.qr-actions { display: grid; grid-template-columns: 1fr; }
+.qr-actions button, .class-export button { width: 100%; }
+.class-export {
+  justify-content: space-between;
+  margin-top: 14px;
+  padding: 14px 0;
+  border-top: 1px dashed var(--border);
+  border-bottom: 1px dashed var(--border);
+}
+.attendance-feed {
+  max-height: 330px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface);
-  box-shadow: 0 12px 40px rgba(37, 31, 25, 0.25);
+  border-radius: 10px;
+  background: #fffdf8;
 }
-.attendance-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
-.attendance-dialog-heading h2 { color: var(--accent-dark); font-family: Georgia, "Times New Roman", serif; }
-.attendance-table-wrap { overflow-x: auto; }
-.attendance-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
-.attendance-table th, .attendance-table td { min-width: 100px; padding: 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
-.attendance-table th { color: var(--muted); font-size: 11px; text-transform: uppercase; }
-.attendance-table td:last-child { min-width: 180px; white-space: pre-wrap; }
+.workspace-drawer {
+  min-width: 0;
+  max-height: 480px;
+  overflow-y: auto;
+}
+.class-settings.workspace-drawer {
+  max-width: none;
+  margin: 0;
+  padding: 14px;
+}
+.meeting-days {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px 12px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+}
+.meeting-days legend { padding: 0 5px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.meeting-day-option {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 400;
+}
+.meeting-day-option input { width: auto; margin: 0; accent-color: var(--accent-dark); }
+.attendance-feed h3 { margin-bottom: 10px; color: var(--accent-dark); font-size: 15px; }
+.attendance-feed ol { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.attendance-feed li { padding: 10px; border: 1px solid #e8dfd0; border-radius: 7px; background: var(--surface); }
+.attendance-feed-person,
+.attendance-feed-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.attendance-feed-person strong { color: var(--ink); font-size: 13px; }
+.attendance-feed-person span,
+.attendance-feed-meta { color: var(--muted); font-size: 11px; }
+.attendance-feed-meta { margin-top: 5px; }
+.attendance-feed-response { margin-top: 8px; padding-top: 7px; border-top: 1px dashed var(--border); color: var(--ink); font-size: 12px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.attendance-empty { padding: 22px 4px; color: var(--muted); font-size: 13px; text-align: center; }
+.student-prompt { display: block; color: var(--ink); font-size: 14px; font-weight: 700; line-height: 1.5; }
 
 label {
   display: grid;
@@ -503,10 +558,7 @@ textarea {
 }
 
 .class-export {
-  justify-content: space-between;
-  margin-top: 24px;
-  padding-top: 16px;
-  border-top: 1px dashed var(--border);
+  flex-wrap: wrap;
 }
 
 .class-export span,
@@ -595,7 +647,7 @@ textarea {
   }
 
   .nav-item { flex: 1 0 auto; min-width: 66px; padding: 0 7px; }
-  .profile-menu { margin-left: auto; align-self: center; }
+  .profile-controls { align-self: center; }
   .app-main { width: min(100% - 20px, 900px); padding-top: 20px; }
   .welcome-card { padding: 28px 22px; }
   .welcome-art { right: -120px; opacity: .5; }
@@ -616,7 +668,9 @@ textarea {
 
   .guest-session-heading { align-items: flex-start; }
   .guest-session-actions { justify-content: flex-start; }
-  .attendance-dialog { padding: 15px; }
+  .qr-workspace { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .attendance-feed { max-height: 280px; }
+  .qr-workspace.with-panel .workspace-drawer { grid-column: auto; }
 
   .class-picker {
     align-items: stretch;
@@ -651,4 +705,13 @@ textarea {
     align-items: stretch;
     flex-direction: column;
   }
+}
+
+@media (min-width: 561px) and (max-width: 980px) {
+  .qr-workspace.with-panel { grid-template-columns: minmax(0, 1fr) minmax(220px, 0.8fr); }
+  .qr-workspace.with-panel .workspace-drawer { grid-column: 1 / -1; }
+}
+
+@media (max-width: 980px) {
+  .guest-main.has-panel { width: min(100% - 32px, 900px); }
 }
