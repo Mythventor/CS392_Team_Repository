@@ -15,12 +15,9 @@
     "@firebase/app": "^0.16.5",
     "@firebase/auth": "^1.13.9",
     "@firebase/database": "^1.1.5",
-    "@zxing/browser": "^0.2.1",
-    "firebase": "^12.19.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "read-excel-file": "^9.3.13"
+    "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@babel/core": "^7.29.7",

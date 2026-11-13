@@ -3,7 +3,11 @@
     "owners": {
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
-        ".write": "auth != null && auth.uid === $uid"
+        "classes": {
+          "$classId": {
+            ".write": "auth != null && auth.uid === $uid && (auth.token.firebase.sign_in_provider !== 'anonymous' || data.exists() || root.child('owners').child($uid).child('classes').exists() === false)"
+          }
+        }
       }
     },
     "publicClasses": {
@@ -19,6 +23,18 @@
         },
         "prompt": {
           ".validate": "newData.isString() && newData.val().length <= 300"
+        },
+        "meetingTime": {
+          ".validate": "newData.isString() && newData.val().matches(/^([01][0-9]|2[0-3]):[0-5][0-9]$/)"
+        },
+        "timeZone": {
+          ".validate": "newData.isString() && newData.val().length <= 80"
+        },
+        "requireDiscussionResponse": {
+          ".validate": "newData.isBoolean()"
+        },
+        "graceMinutes": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 60"
         },
         "$other": {
           ".validate": false
@@ -46,7 +62,7 @@
         ".read": "auth != null && root.child('publicClasses').child($classId).child('ownerUid').val() === auth.uid",
         "$checkinId": {
           ".write": "auth != null && ((root.child('publicClasses').child($classId).child('ownerUid').val() === auth.uid) || (!data.exists() && newData.child('sessionCode').val() === root.child('sessionTokens').child($classId).child('code').val()))",
-          ".validate": "newData.hasChildren(['name', 'studentId', 'status', 'checkedInAt', 'sessionCode'])",
+          ".validate": "newData.hasChildren(['name', 'studentId', 'status', 'checkedInAt', 'sessionCode']) && (root.child('publicClasses').child($classId).child('requireDiscussionResponse').val() !== true || (newData.child('discussionResponse').isString() && newData.child('discussionResponse').val().length > 0))",
           "name": {
             ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 120"
           },
@@ -59,8 +75,14 @@
           "checkedInAt": {
             ".validate": "newData.isNumber()"
           },
+          "arrivalStatus": {
+            ".validate": "newData.val() === 'On time' || newData.val() === 'Late'"
+          },
           "sessionCode": {
             ".validate": "newData.isString()"
+          },
+          "discussionResponse": {
+            ".validate": "newData.isString() && newData.val().length <= 1000"
           },
           "$other": {
             ".validate": false

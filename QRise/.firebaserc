@@ -1,13 +1,8 @@
 {
   "projects": {
-<<<<<<< HEAD
-    "default": "here--attendance"
-  }
-}
-=======
-    "default": "cs392-react-challenge-692dd"
+    "default": "here--attendance",
+    "dist": "here--attendance"
   },
   "targets": {},
   "etags": {}
 }
->>>>>>> 26ce73e83a285273d0ade50f5abe4a41945b6f67

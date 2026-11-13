@@ -1,27 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import QRCode from "qrcode";
-<<<<<<< HEAD
 import {
   createUserWithEmailAndPassword,
+  deleteUser,
+  EmailAuthProvider,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   signInAnonymously,
   signInWithEmailAndPassword,
   signOut,
+  linkWithCredential,
+  updatePassword,
+  updateProfile,
 } from "@firebase/auth";
 import { get, onValue, push, ref, update } from "@firebase/database";
 import { auth, database, firebaseConfigError } from "./firebase";
 import { usernameToAuthEmail, validateUsername } from "./username";
-=======
-import AlarmManagement from "./alarms/AlarmManagement";
-import { displayTime, repeatLabel } from "./alarms/model";
-import { nextOccurrence } from "./alarm-system/scheduler";
-import AlarmSystem from "./alarm-system/AlarmSystem";
-import { readAlarms, readQrCodes, writeAlarms, writeQrCodes } from "./storage";
-import { createQrPayload, findMatchingQrCode } from "./qr/model";
-import CheckInPage, { CheckInHomeCard } from "./checkin/CheckIn";
-import { locationSearch, readLocation } from "./checkin/model";
->>>>>>> 26ce73e83a285273d0ade50f5abe4a41945b6f67
+import { classAttendanceStatus } from "./classAttendance";
 import "./App.css";
+
+const APP_PAGES = new Set(["home", "classes", "account"]);
+
+function readPage(search) {
+  const requestedPage = new URLSearchParams(search).get("page");
+  return APP_PAGES.has(requestedPage) ? requestedPage : "home";
+}
 
 function generateCode() {
   return crypto.randomUUID().replaceAll("-", "").slice(0, 12).toUpperCase();
@@ -30,6 +33,7 @@ function generateCode() {
 function authErrorMessage(error, mode) {
   switch (error?.code) {
     case "auth/email-already-in-use":
+    case "auth/credential-already-in-use":
       return "That username is already taken. Try another one.";
     case "auth/invalid-credential":
     case "auth/user-not-found":
@@ -50,12 +54,13 @@ function authErrorMessage(error, mode) {
       return "Could not reach Firebase. Check your network connection and try again.";
     case "auth/too-many-requests":
       return "Too many attempts. Wait a little while before trying again.";
+    case "auth/requires-recent-login":
+      return "For your security, sign out and sign in again before trying that change.";
     default:
       return `${mode === "signup" ? "Account creation" : mode === "guest" ? "Guest access" : "Sign-in"} failed (${error?.code ?? "unknown error"}). Please try again.`;
   }
 }
 
-<<<<<<< HEAD
 function databaseErrorMessage(error, action) {
   if (error?.code === "PERMISSION_DENIED" || error?.code === "permission-denied") {
     return `Firebase denied ${action}. Check that database.rules.json is deployed and the signed-in user owns this class.`;
@@ -63,21 +68,43 @@ function databaseErrorMessage(error, action) {
   return `Could not ${action}: ${error?.message ?? "unknown database error"}`;
 }
 
-function AccountForm({ mode, onSubmit, onBack, busy, error, available }) {
-  const isSignup = mode === "signup";
-=======
 function Navigation({ page, onNavigate }) {
   const items = [
     { id: "home", label: "Home", icon: "⌂" },
-    { id: "checkin", label: "Check-in", icon: "✓" },
-    { id: "alarms", label: "Alarms", icon: "◷" },
-    { id: "qr", label: "QR code", icon: "▦" },
+    { id: "classes", label: "Classes", icon: "▤" },
+    { id: "account", label: "Account", icon: "◉" },
   ];
->>>>>>> 26ce73e83a285273d0ade50f5abe4a41945b6f67
+
+  return (
+    <nav className="app-nav" aria-label="Main navigation">
+      {items.map((item) => (
+        <button
+          className="nav-item"
+          key={item.id}
+          type="button"
+          aria-current={page === item.id ? "page" : undefined}
+          onClick={() => onNavigate(item.id)}
+        >
+          <span className="nav-icon" aria-hidden="true">{item.icon}</span>
+          {item.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function AccountForm({ mode, onSubmit, onBack, busy, error, available }) {
+  const isSignup = mode === "signup";
 
   return (
     <form className="account-form" onSubmit={onSubmit}>
       <h2>{isSignup ? "Create teacher account" : "Teacher sign-in"}</h2>
+      {isSignup && (
+        <label>
+          Display name
+          <input name="displayName" type="text" autoComplete="name" maxLength={60} required />
+        </label>
+      )}
       <label>
         Username
         <input
@@ -168,6 +195,7 @@ function StudentCheckInPage({ authStatus, user }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [student, setStudent] = useState({ name: "", studentId: "" });
+  const [discussionResponse, setDiscussionResponse] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const anonymousSignInStarted = useRef(false);
 
@@ -203,16 +231,30 @@ function StudentCheckInPage({ authStatus, user }) {
   const submitCheckIn = async (event) => {
     event.preventDefault();
     setError("");
+    const response = discussionResponse.trim();
+    if (classInfo?.requireDiscussionResponse && !response) {
+      setError("Please answer the discussion prompt before checking in.");
+      return;
+    }
     try {
       const newCheckIn = push(ref(database, `checkins/${classId}`));
       if (!newCheckIn.key) throw new Error("Firebase did not create an attendance record ID.");
-      await update(newCheckIn, {
+      const checkedInAt = Date.now();
+      const checkInRecord = {
         name: student.name.trim(),
         studentId: student.studentId.trim(),
         status: "Present",
-        checkedInAt: Date.now(),
+        checkedInAt,
+        arrivalStatus: classAttendanceStatus(
+          checkedInAt,
+          classInfo?.meetingTime,
+          classInfo?.graceMinutes ?? 5,
+          classInfo?.timeZone,
+        ),
         sessionCode: code,
-      });
+      };
+      if (classInfo?.prompt && response) checkInRecord.discussionResponse = response;
+      await update(newCheckIn, checkInRecord);
       setSubmitted(true);
     } catch (submitError) {
       setError(submitError?.code === "PERMISSION_DENIED" || submitError?.code === "permission-denied"
@@ -221,7 +263,6 @@ function StudentCheckInPage({ authStatus, user }) {
     }
   };
 
-<<<<<<< HEAD
   if (!classId || !code) {
     return <StudentMessage title="Check-in unavailable" message="This QR link is incomplete. Ask your instructor for a current code." />;
   }
@@ -259,30 +300,33 @@ function StudentCheckInPage({ authStatus, user }) {
               required
             />
           </label>
+          {classInfo?.prompt && (
+            <label>
+              Your response{classInfo.requireDiscussionResponse ? " (required)" : " (optional)"}
+              <textarea
+                value={discussionResponse}
+                onChange={(event) => setDiscussionResponse(event.target.value)}
+                maxLength={1000}
+                required={Boolean(classInfo.requireDiscussionResponse)}
+              />
+            </label>
+          )}
           <button className="primary" type="submit">Submit check-in</button>
         </form>
         {error && <p className="firebase-error" role="alert">{error}</p>}
       </section>
     </main>
-=======
-function HomeDashboard({ alarms, onOpenCheckIn }) {
-  const nextAlarm = useMemo(() => {
-    const now = new Date();
-    return alarms
-      .filter((alarm) => alarm.enabled)
-      .map((alarm) => ({ alarm, time: nextOccurrence(alarm, now) }))
-      .filter((item) => item.time !== null)
-      .sort((a, b) => a.time - b.time)[0] ?? null;
-  }, [alarms]);
-  const enabledCount = alarms.filter((alarm) => alarm.enabled).length;
+  );
+}
 
+function HomeDashboard({ onOpenClasses }) {
   return (
     <section className="home-dashboard" aria-labelledby="welcome-title">
       <div className="welcome-card">
         <div className="welcome-copy">
-          <p className="eyebrow">A better morning starts tonight</p>
-          <h1 id="welcome-title">Rise with intention.</h1>
-          <p>Pair alarms with printed QR codes, then get moving to scan one when it is time to rise. Now with QR check-in for classes, clubs, and events.</p>
+          <p className="eyebrow">Attendance, made simpler</p>
+          <h1 id="welcome-title">Make every check-in count.</h1>
+          <p>Create classes, share a QR code, and keep attendance organized in one place.</p>
         </div>
         <div className="welcome-art" aria-hidden="true">
           <span className="sun-orbit" />
@@ -291,41 +335,16 @@ function HomeDashboard({ alarms, onOpenCheckIn }) {
           <span className="horizon horizon-front" />
         </div>
       </div>
-      <CheckInHomeCard onOpen={onOpenCheckIn} />
-      <div className="overview-grid">
-        <article className="overview-card next-alarm-card">
-          <div className="overview-icon" aria-hidden="true">◷</div>
-          <div>
-            <p className="overview-label">Next alarm</p>
-            {nextAlarm ? (
-              <>
-                <p className="overview-value">
-                  {displayTime(nextAlarm.alarm.time).clock}
-                  <span>{displayTime(nextAlarm.alarm.time).period}</span>
-                </p>
-                <p className="overview-detail">
-                  {nextAlarm.alarm.label} · {new Date(nextAlarm.time).toLocaleDateString(undefined, { weekday: "long" })}
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="overview-value overview-empty">Nothing scheduled</p>
-                <p className="overview-detail">Add an alarm to plan your next morning.</p>
-              </>
-            )}
-          </div>
-        </article>
-        <article className="overview-card">
-          <div className="overview-icon" aria-hidden="true">◉</div>
-          <div>
-            <p className="overview-label">Your schedule</p>
-            <p className="overview-value">{enabledCount}<span>{enabledCount === 1 ? " alarm" : " alarms"}</span></p>
-            <p className="overview-detail">{alarms.length - enabledCount} turned off</p>
-          </div>
-        </article>
-      </div>
+      <article className="overview-card">
+        <div className="overview-icon" aria-hidden="true">▤</div>
+        <div>
+          <p className="overview-label">Your classes</p>
+          <p className="overview-value">Manage attendance</p>
+          <p className="overview-detail">Create a class and share its QR check-in code.</p>
+          <button className="primary home-class-button" type="button" onClick={onOpenClasses}>Open classes</button>
+        </div>
+      </article>
     </section>
->>>>>>> 26ce73e83a285273d0ade50f5abe4a41945b6f67
   );
 }
 
@@ -338,7 +357,7 @@ function buildCheckInUrl(classItem) {
   return url.toString();
 }
 
-function GuestWorkspace({
+function ClassWorkspace({
   user,
   classes,
   records,
@@ -350,22 +369,37 @@ function GuestWorkspace({
   onDeleteClass,
   onRefreshCode,
   onError,
-  onSignOut,
+  onCreateAccount,
+  onEndGuest,
+  guestSignup,
+  onSignupSubmit,
+  onSignupBack,
+  busy,
+  error,
+  available,
   dataLoading,
 }) {
   const [newClassName, setNewClassName] = useState("");
+  const [creatingClass, setCreatingClass] = useState(false);
+  const [guestClassCreated, setGuestClassCreated] = useState(false);
   const [qrResult, setQrResult] = useState({ value: "", image: "", error: "" });
   const [settings, setSettings] = useState(false);
+  const [attendanceOpen, setAttendanceOpen] = useState(false);
   const classRecords = records.filter((record) => record.classId === selectedClassId);
   const checkInUrl = selectedClass?.sessionCode ? buildCheckInUrl(selectedClass) : "";
   const qrImage = qrResult.value === checkInUrl ? qrResult.image : "";
   const qrError = qrResult.value === checkInUrl ? qrResult.error : "";
 
-  const handleSignOut = () => {
+  const endGuestSession = async () => {
     const confirmed = window.confirm(
-      "Signing out ends access to this guest account and its classes. Continue only if you no longer need them.",
+      "End this guest session and permanently delete its class and attendance data? This cannot be undone. Create an account instead to keep your data.",
     );
-    if (confirmed) onSignOut();
+    if (!confirmed) return;
+    try {
+      await onEndGuest();
+    } catch (endError) {
+      onError(databaseErrorMessage(endError, "end the guest session and delete its data"));
+    }
   };
 
   useEffect(() => {
@@ -385,13 +419,20 @@ function GuestWorkspace({
     if (!selectedClass) return;
     const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
     const rows = [
-      ["name", "studentId", "class", "status", "checkedInAt"],
+      ["name", "studentId", "class", "status", "checkedInAt", "arrivalStatus", "discussionResponse"],
       ...classRecords.map((record) => [
         record.name,
         record.studentId,
         selectedClass.name,
         record.status,
         new Date(record.checkedInAt).toISOString(),
+        record.arrivalStatus || classAttendanceStatus(
+          record.checkedInAt,
+          selectedClass.meetingTime,
+          selectedClass.graceMinutes ?? 5,
+          selectedClass.timeZone,
+        ),
+        record.discussionResponse || "",
       ]),
     ];
     const csv = rows.map((row) => row.map(escapeCsv).join(",")).join("\r\n");
@@ -404,15 +445,35 @@ function GuestWorkspace({
   };
 
   return (
-<<<<<<< HEAD
     <main className="guest-main">
-      <header className="guest-heading">
-        <span className="brand-mark" aria-hidden="true"><span /></span>
-        <h1>Here!</h1>
-        <button className="link-button" type="button" onClick={handleSignOut}>End guest session</button>
-      </header>
+      {user.isAnonymous && (
+        <header className="guest-heading guest-session-heading">
+          <div>
+            <h1>Guest session</h1>
+            <p>Your data is temporary. Create an account to keep this class and its attendance.</p>
+          </div>
+          <div className="guest-session-actions">
+            {!guestSignup && <button className="secondary" type="button" onClick={onCreateAccount}>Create account</button>}
+            {guestSignup && <button className="secondary" type="button" onClick={onSignupBack}>Back to class</button>}
+            <button className="link-button" type="button" onClick={endGuestSession} disabled={busy || dataLoading}>
+              End guest session
+            </button>
+          </div>
+        </header>
+      )}
 
-      <section className="guest-class-panel" aria-label="Guest attendance workspace">
+      <section className="guest-class-panel" aria-label="Class attendance workspace">
+        {guestSignup ? (
+          <AccountForm
+            mode="signup"
+            onSubmit={onSignupSubmit}
+            onBack={onSignupBack}
+            busy={busy}
+            error={error}
+            available={available}
+          />
+        ) : (
+          <>
         <div className="class-picker" aria-label="Classes">
           {classes.map((classItem) => (
             <button
@@ -425,17 +486,21 @@ function GuestWorkspace({
               {classItem.name}
             </button>
           ))}
-          <form
+          {(!user.isAnonymous || (classes.length === 0 && !guestClassCreated)) && <form
             className="new-class-form"
             onSubmit={async (event) => {
               event.preventDefault();
               const name = newClassName.trim();
-              if (!name) return;
+              if (!name || creatingClass) return;
+              setCreatingClass(true);
               try {
                 await onCreateClass(name);
                 setNewClassName("");
+                if (user.isAnonymous) setGuestClassCreated(true);
               } catch (createError) {
                 onError(databaseErrorMessage(createError, "create the class"));
+              } finally {
+                setCreatingClass(false);
               }
             }}
           >
@@ -446,60 +511,10 @@ function GuestWorkspace({
               onChange={(event) => setNewClassName(event.target.value)}
               maxLength={100}
               required
+              disabled={creatingClass}
             />
-            <button className="add-class-button" type="submit" aria-label="Create class">+</button>
-          </form>
-=======
-    <section className="qr-page" aria-labelledby="qr-title">
-      <div className="page-heading">
-        <p className="eyebrow">Make getting up a little more active</p>
-        <h1 id="qr-title">Your QR code</h1>
-        <p>Generate a unique code for each alarm, then print or save it somewhere you will need to get up to reach.</p>
-      </div>
-      {!alarms.length ? (
-        <p className="qr-note">Create an alarm before generating its QR code.</p>
-      ) : (
-        <div className="qr-code-list">
-          {alarms.map((alarm) => {
-            const qrCode = qrCodes.find((item) => item.alarmId === alarm.id);
-            return (
-              <article
-                className="qr-code-card"
-                data-printing={printingCode === alarm.id ? "true" : undefined}
-                key={alarm.id}
-              >
-                <div className="qr-code-art">
-                  {qrCode
-                    ? <QrCodeImage qrCode={qrCode} alarmLabel={alarm.label} />
-                    : <div className="qr-placeholder" aria-hidden="true"><span className="qr-placeholder-icon">▦</span></div>}
-                </div>
-                <div className="qr-setup-copy">
-                  <span className={`status-pill${qrCode ? " status-pill-ready" : ""}`}>
-                    <span />{qrCode ? "Ready to print" : "Not set up"}
-                  </span>
-                  <h2>{alarm.label}</h2>
-                  <p className="qr-alarm-time">
-                    <span>{displayTime(alarm.time).clock} {displayTime(alarm.time).period}</span>
-                    {" · "}{repeatLabel(alarm.days)}{alarm.enabled ? "" : " · Off"}
-                  </p>
-                  <p>
-                    {qrCode
-                      ? "This unique code is paired with this alarm. Scan it while this alarm is ringing to turn it off."
-                      : "Create a one-of-a-kind code paired with this alarm. You can replace it later; the previous code will stop working."}
-                  </p>
-                  <div className="qr-code-actions">
-                    <button className="primary" type="button" onClick={() => onCreate(alarm)}>
-                      {qrCode ? "Replace QR code" : "Generate QR code"}
-                    </button>
-                    {qrCode && (
-                      <button className="secondary" type="button" onClick={() => onPrint(alarm.id)}>Print QR code</button>
-                    )}
-                  </div>
-                </div>
-              </article>
-            );
-          })}
->>>>>>> 26ce73e83a285273d0ade50f5abe4a41945b6f67
+            <button className="add-class-button" type="submit" aria-label="Create class" disabled={creatingClass}>+</button>
+          </form>}
         </div>
 
         {dataLoading ? (
@@ -548,10 +563,22 @@ function GuestWorkspace({
                 onSubmit={async (event) => {
                   event.preventDefault();
                   try {
+                    const prompt = event.currentTarget.elements.namedItem("prompt").value.trim();
+                    const requireDiscussionResponse = event.currentTarget.elements.namedItem("requireDiscussionResponse").checked;
+                    const graceEnabled = event.currentTarget.elements.namedItem("graceEnabled").checked;
+                    const graceValue = Number(event.currentTarget.elements.namedItem("graceMinutes").value);
+                    if (requireDiscussionResponse && !prompt) {
+                      throw new Error("Add a discussion prompt before requiring students to answer it.");
+                    }
+                    if (graceEnabled && (!Number.isInteger(graceValue) || graceValue < 1 || graceValue > 60)) {
+                      throw new Error("Set the grace period to a whole number from 1 to 60 minutes, or turn it off.");
+                    }
                     await onUpdateClass(selectedClass.id, {
                       name: event.currentTarget.elements.namedItem("className").value.trim(),
                       meetingTime: event.currentTarget.elements.namedItem("meetingTime").value,
-                      prompt: event.currentTarget.elements.namedItem("prompt").value.trim(),
+                      prompt,
+                      requireDiscussionResponse,
+                      graceMinutes: graceEnabled ? graceValue : 0,
                     });
                     setSettings(false);
                   } catch (updateError) {
@@ -568,8 +595,35 @@ function GuestWorkspace({
                   <input name="meetingTime" type="time" defaultValue={selectedClass.meetingTime || "09:00"} required />
                 </label>
                 <label>
-                  Check-in prompt
+                  Discussion prompt
                   <textarea name="prompt" defaultValue={selectedClass.prompt || ""} maxLength={300} />
+                </label>
+                <label className="setting-toggle">
+                  <input
+                    name="requireDiscussionResponse"
+                    type="checkbox"
+                    defaultChecked={Boolean(selectedClass.requireDiscussionResponse)}
+                  />
+                  Require students to answer the discussion prompt
+                </label>
+                <label className="setting-toggle">
+                  <input
+                    name="graceEnabled"
+                    type="checkbox"
+                    defaultChecked={(selectedClass.graceMinutes ?? 5) > 0}
+                  />
+                  Allow a grace period after the meeting time
+                </label>
+                <label>
+                  Grace period (minutes)
+                  <input
+                    name="graceMinutes"
+                    type="number"
+                    min="1"
+                    max="60"
+                    defaultValue={selectedClass.graceMinutes ?? 5}
+                  />
+                  <span className="account-hint">Uncheck the grace-period option to mark check-ins late immediately after the meeting time.</span>
                 </label>
                 <div className="settings-actions">
                   <button className="primary" type="submit">Save settings</button>
@@ -579,6 +633,7 @@ function GuestWorkspace({
                     onClick={async () => {
                       try {
                         await onDeleteClass(selectedClass);
+                        if (user.isAnonymous) setGuestClassCreated(false);
                         setSettings(false);
                       } catch (deleteError) {
                         onError(databaseErrorMessage(deleteError, "remove the class"));
@@ -592,41 +647,172 @@ function GuestWorkspace({
             )}
             <div className="class-export">
               <span>{classRecords.length} check-in{classRecords.length === 1 ? "" : "s"}</span>
+              <button className="secondary" type="button" onClick={() => setAttendanceOpen(true)}>View attendance</button>
               <button className="primary" type="button" onClick={exportClassCsv}>Export this class</button>
             </div>
+            {attendanceOpen && (
+              <div className="attendance-backdrop" onMouseDown={(event) => {
+                if (event.target === event.currentTarget) setAttendanceOpen(false);
+              }}>
+                <section className="attendance-dialog" role="dialog" aria-modal="true" aria-labelledby="attendance-title">
+                  <header className="attendance-dialog-heading">
+                    <h2 id="attendance-title">{selectedClass.name} attendance</h2>
+                    <button className="secondary" type="button" onClick={() => setAttendanceOpen(false)}>Close</button>
+                  </header>
+                  {classRecords.length === 0 ? (
+                    <p className="empty-class">No one has checked in yet.</p>
+                  ) : (
+                    <div className="attendance-table-wrap">
+                      <table className="attendance-table">
+                        <thead>
+                          <tr>
+                            <th>Name</th>
+                            <th>Student ID</th>
+                            <th>Checked in</th>
+                            <th>Arrival</th>
+                            {selectedClass.prompt && <th>Discussion response</th>}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {classRecords.map((record) => (
+                            <tr key={record.id}>
+                              <td>{record.name}</td>
+                              <td>{record.studentId}</td>
+                              <td>{new Date(record.checkedInAt).toLocaleString()}</td>
+                              <td>{record.arrivalStatus || classAttendanceStatus(
+                                record.checkedInAt,
+                                selectedClass.meetingTime,
+                                selectedClass.graceMinutes ?? 5,
+                                selectedClass.timeZone,
+                              )}</td>
+                              {selectedClass.prompt && <td>{record.discussionResponse || "—"}</td>}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
           </>
         )}
-        {user.isAnonymous && (
-          <p className="local-data-note">Guest classes are linked to this browser’s anonymous account. Don’t clear browser data if you need to keep access.</p>
+          </>
         )}
       </section>
     </main>
   );
 }
 
-function TeacherPage({ user, onSignOut, onContinueAsGuest, busy, error }) {
-  const username = user.displayName || user.email?.split("@")[0] || "Teacher";
+function ProfileMenu({ user, classes, onNavigate, onOpenClass }) {
+  const displayName = user.displayName || user.email?.split("@")[0] || "Account";
+  const closeMenu = (event) => {
+    const menu = event.currentTarget.closest("details");
+    if (menu) menu.open = false;
+  };
+
   return (
-    <main className="welcome-page">
-      <section className="welcome-sheet" aria-labelledby="welcome-title">
-        <div className="welcome-stamp" aria-hidden="true">H!</div>
-        <h1 id="welcome-title">Here!</h1>
-        <h2 className="account-welcome">Welcome, {username}</h2>
-        <p className="teacher-status-message">Teacher class management is not available yet.</p>
-        {error && <p className="firebase-error" role="alert">{error}</p>}
-        <div className="welcome-actions">
-          <button className="primary" type="button" onClick={onContinueAsGuest} disabled={busy}>
-            {busy ? "Connecting…" : "Continue as guest"}
+    <details className="profile-menu">
+      <summary>{displayName}<span aria-hidden="true">⌄</span></summary>
+      <div className="profile-menu-panel">
+        <button type="button" onClick={(event) => { closeMenu(event); onNavigate("account"); }}>Account settings</button>
+        <p>Your classes</p>
+        {classes.length ? classes.map((classItem) => (
+          <button
+            key={classItem.id}
+            type="button"
+            onClick={(event) => { closeMenu(event); onOpenClass(classItem.id); }}
+          >
+            {classItem.name}
           </button>
-          <button className="secondary" type="button" onClick={onSignOut} disabled={busy}>Sign out</button>
-        </div>
-      </section>
-    </main>
+        )) : <span className="profile-menu-empty">No classes yet</span>}
+      </div>
+    </details>
+  );
+}
+
+function AccountPage({ user, classes, onSaveProfile, onChangePassword, onSignOut, onOpenClass, busy, error, onError }) {
+  const username = user.email?.split("@")[0] || "Guest";
+  const saveProfile = async (event) => {
+    event.preventDefault();
+    try {
+      await onSaveProfile(String(new FormData(event.currentTarget).get("displayName") || ""));
+    } catch (saveError) {
+      onError(saveError.message || "Could not save your profile.");
+    }
+  };
+  const changePassword = async (event) => {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    try {
+      await onChangePassword(
+        String(formData.get("currentPassword") || ""),
+        String(formData.get("newPassword") || ""),
+      );
+      event.currentTarget.reset();
+    } catch (passwordError) {
+      onError(passwordError.message || "Could not change your password.");
+    }
+  };
+
+  return (
+    <section className="account-page" aria-labelledby="account-title">
+      <div className="page-heading">
+        <p className="eyebrow">Your QRise account</p>
+        <h1 id="account-title">Account</h1>
+        <p>{user.isAnonymous ? "You are using a guest account." : `Signed in as ${username}.`}</p>
+      </div>
+      {user.isAnonymous ? (
+        <p className="local-data-note">Create an account to keep your class and attendance data.</p>
+      ) : (
+        <>
+          <form className="account-form profile-form" onSubmit={saveProfile}>
+            <label>
+              Display name
+              <input name="displayName" autoComplete="name" defaultValue={user.displayName || ""} maxLength={60} required />
+            </label>
+            <p className="account-hint">Your classes are saved to this account and will be available when you sign in again.</p>
+            <button className="primary" type="submit" disabled={busy}>Save profile</button>
+          </form>
+          <section className="account-class-list" aria-labelledby="account-classes-title">
+            <h2 id="account-classes-title">Your classes</h2>
+            {classes.length ? (
+              <ul>
+                {classes.map((classItem) => (
+                  <li key={classItem.id}>
+                    <button className="secondary" type="button" onClick={() => onOpenClass(classItem.id)}>
+                      {classItem.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="account-hint">You have not created any classes yet.</p>}
+          </section>
+          <form className="account-form profile-form" onSubmit={changePassword}>
+            <h2>Change password</h2>
+            <label>
+              Current password
+              <input name="currentPassword" type="password" autoComplete="current-password" required />
+            </label>
+            <label>
+              New password
+              <input name="newPassword" type="password" autoComplete="new-password" minLength="8" required />
+            </label>
+            <button className="primary" type="submit" disabled={busy}>Update password</button>
+          </form>
+        </>
+      )}
+      {error && <p className="firebase-error" role="alert">{error}</p>}
+      <div className="account-actions">
+        <button className="secondary" type="button" onClick={onSignOut} disabled={busy}>
+          {user.isAnonymous ? "End guest session" : "Sign out"}
+        </button>
+      </div>
+    </section>
   );
 }
 
 export default function App() {
-<<<<<<< HEAD
   const [user, setUser] = useState(null);
   const [authStatus, setAuthStatus] = useState(auth ? "loading" : "error");
   const [view, setView] = useState("home");
@@ -635,26 +821,16 @@ export default function App() {
   const [classes, setClasses] = useState([]);
   const [records, setRecords] = useState([]);
   const [recordsClassId, setRecordsClassId] = useState("");
+  const [recordsUid, setRecordsUid] = useState("");
   const [selectedClassId, setSelectedClassId] = useState("");
   const [classesLoadedUid, setClassesLoadedUid] = useState("");
   const isStudentCheckIn = new URLSearchParams(window.location.search).has("checkin");
   const authAvailable = Boolean(auth);
-=======
-  const [initial] = useState(getInitialAlarms);
-  const [initialQr] = useState(getInitialQrCodes);
-  const [alarms, setAlarms] = useState(initial.alarms);
-  const [qrCodes, setQrCodes] = useState(initialQr.qrCodes);
-  const [storageError, setStorageError] = useState(initial.error);
-  const [qrStorageError, setQrStorageError] = useState(initialQr.error);
-  const [printingCode, setPrintingCode] = useState("");
-  // Where the user is (page + check-in view) lives in the address bar, so a refresh
-  // reopens the same screen and the browser's Back button works.
-  const [location, setLocation] = useState(() => readLocation(window.location.search));
-  const { page, route: checkinRoute } = location;
+  const [page, setPage] = useState(() => readPage(window.location.search));
 
-  const go = useCallback((next) => {
-    setLocation(next);
-    const search = locationSearch(next);
+  const navigate = useCallback((nextPage) => {
+    setPage(nextPage);
+    const search = nextPage === "home" ? "" : `?page=${encodeURIComponent(nextPage)}`;
     if (search !== window.location.search) {
       window.history.pushState(null, "", `${window.location.pathname}${search}`);
     }
@@ -662,55 +838,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    const restore = () => setLocation(readLocation(window.location.search));
+    const restore = () => setPage(readPage(window.location.search));
     window.addEventListener("popstate", restore);
     return () => window.removeEventListener("popstate", restore);
   }, []);
-
-  const navigate = useCallback((nextPage) => go({ page: nextPage, route: null }), [go]);
-  const changeCheckinRoute = useCallback((route) => go({ page: "checkin", route }), [go]);
-
-  const updateAlarms = useCallback((nextAlarms) => {
-    setAlarms(nextAlarms);
-    try {
-      writeAlarms(nextAlarms);
-      setStorageError("");
-    } catch {
-      setStorageError("Your alarm changes are active for this session but could not be saved on this device.");
-    }
-  }, []);
-
-  const disableAlarms = useCallback((ids) => {
-    updateAlarms(
-      alarms.map((alarm) => ids.includes(alarm.id) ? { ...alarm, enabled: false } : alarm),
-    );
-  }, [alarms, updateAlarms]);
-
-  const saveQrCodes = useCallback((nextQrCodes) => {
-    setQrCodes(nextQrCodes);
-    try {
-      writeQrCodes(nextQrCodes);
-      setQrStorageError("");
-    } catch {
-      setQrStorageError("Your QR code changes are active for this session but could not be saved on this device.");
-    }
-  }, []);
-
-  const createQrCode = useCallback((alarm) => {
-    const id = crypto.randomUUID();
-    saveQrCodes([
-      ...qrCodes.filter((qrCode) => qrCode.alarmId !== alarm.id),
-      { id, alarmId: alarm.id },
-    ]);
-  }, [qrCodes, saveQrCodes]);
-
-  const scanAndVerify = useCallback(async ({ alarm, signal, video }) => {
-    const { scanQrCode } = await import("./qr/scanner");
-    const payload = await scanQrCode({ video, signal });
-    if (payload === null || signal.aborted) return false;
-    return findMatchingQrCode(payload, qrCodes, alarm.id) !== null;
-  }, [qrCodes]);
->>>>>>> 26ce73e83a285273d0ade50f5abe4a41945b6f67
 
   useEffect(() => {
     if (!auth) return undefined;
@@ -724,9 +855,8 @@ export default function App() {
     });
   }, []);
 
-<<<<<<< HEAD
   useEffect(() => {
-    if (!user?.isAnonymous) return undefined;
+    if (!user) return undefined;
 
     const unsubscribe = onValue(ref(database, `owners/${user.uid}/classes`), (snapshot) => {
       const nextClasses = snapshot.exists()
@@ -740,35 +870,42 @@ export default function App() {
       setError("");
     }, (loadError) => {
       setError(databaseErrorMessage(loadError, "load your classes"));
+      setClasses([]);
       setClassesLoadedUid(user.uid);
     });
     return unsubscribe;
   }, [user]);
 
   useEffect(() => {
-    if (!user?.isAnonymous || !selectedClassId) return undefined;
+    if (
+      !user
+      || classesLoadedUid !== user.uid
+      || !selectedClassId
+      || !classes.some((item) => item.id === selectedClassId)
+    ) return undefined;
     const unsubscribe = onValue(ref(database, `checkins/${selectedClassId}`), (snapshot) => {
       const nextRecords = snapshot.exists()
         ? Object.entries(snapshot.val()).map(([id, value]) => ({ id, classId: selectedClassId, ...value }))
         : [];
       setRecords(nextRecords);
       setRecordsClassId(selectedClassId);
+      setRecordsUid(user.uid);
     }, (loadError) => {
       setError(databaseErrorMessage(loadError, "load attendance"));
     });
     return unsubscribe;
-  }, [user, selectedClassId]);
+  }, [user, selectedClassId, classesLoadedUid, classes]);
 
-  const selectedClass = useMemo(
-    () => classes.find((item) => item.id === selectedClassId) ?? null,
-    [classes, selectedClassId],
-  );
+  const selectedClass = classesLoadedUid === user?.uid
+    ? classes.find((item) => item.id === selectedClassId) ?? null
+    : null;
 
   const submitCredentials = async (event) => {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
     const username = String(formData.get("username") || "").trim();
     const password = String(formData.get("password") || "");
+    const displayName = String(formData.get("displayName") || "").trim();
     setError("");
 
     if (!validateUsername(username)) {
@@ -779,6 +916,10 @@ export default function App() {
       setError("Password must be at least 8 characters.");
       return;
     }
+    if (view === "signup" && (!displayName || displayName.length > 60)) {
+      setError("Display name must be between 1 and 60 characters.");
+      return;
+    }
 
     setBusy(true);
     try {
@@ -787,8 +928,17 @@ export default function App() {
         setError(firebaseConfigError || "Firebase Authentication is unavailable.");
         return;
       }
-      if (view === "signup") await createUserWithEmailAndPassword(auth, email, password);
-      else await signInWithEmailAndPassword(auth, email, password);
+      if (view === "signup") {
+        const accountCredential = auth.currentUser?.isAnonymous
+          ? await linkWithCredential(auth.currentUser, EmailAuthProvider.credential(email, password))
+          : await createUserWithEmailAndPassword(auth, email, password);
+        const credential = accountCredential;
+        await updateProfile(credential.user, { displayName });
+        setUser(credential.user);
+        setView("home");
+      } else {
+        await signInWithEmailAndPassword(auth, email, password);
+      }
     } catch (authError) {
       setError(authErrorMessage(authError, view));
     } finally {
@@ -827,12 +977,31 @@ export default function App() {
   };
 
   const createClass = async (name) => {
+    if (user.isAnonymous && classes.length > 0) {
+      throw new Error("Guest accounts can create only one class. Create an account to manage more classes.");
+    }
     const classRef = push(ref(database, `owners/${user.uid}/classes`));
     if (!classRef.key) throw new Error("Firebase did not create a class ID.");
-    const classItem = { name, meetingTime: "09:00", prompt: "", sessionCode: generateCode() };
+    const classItem = {
+      name,
+      meetingTime: "09:00",
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      prompt: "",
+      requireDiscussionResponse: false,
+      graceMinutes: 5,
+      sessionCode: generateCode(),
+    };
     await update(ref(database), {
       [`owners/${user.uid}/classes/${classRef.key}`]: classItem,
-      [`publicClasses/${classRef.key}`]: { ownerUid: user.uid, name, prompt: "" },
+      [`publicClasses/${classRef.key}`]: {
+        ownerUid: user.uid,
+        name,
+        prompt: "",
+        meetingTime: classItem.meetingTime,
+        timeZone: classItem.timeZone,
+        requireDiscussionResponse: false,
+        graceMinutes: 5,
+      },
       [`sessionTokens/${classRef.key}`]: { ownerUid: user.uid, code: classItem.sessionCode },
     });
     setSelectedClassId(classRef.key);
@@ -845,11 +1014,18 @@ export default function App() {
       [`owners/${user.uid}/classes/${classId}`]: {
         name: changes.name,
         meetingTime: changes.meetingTime,
+        timeZone: previous.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
         prompt: changes.prompt,
+        requireDiscussionResponse: changes.requireDiscussionResponse,
+        graceMinutes: changes.graceMinutes,
         sessionCode: previous.sessionCode,
       },
       [`publicClasses/${classId}/name`]: changes.name,
       [`publicClasses/${classId}/prompt`]: changes.prompt,
+      [`publicClasses/${classId}/meetingTime`]: changes.meetingTime,
+      [`publicClasses/${classId}/timeZone`]: previous.timeZone || Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+      [`publicClasses/${classId}/requireDiscussionResponse`]: changes.requireDiscussionResponse,
+      [`publicClasses/${classId}/graceMinutes`]: changes.graceMinutes,
     });
   };
 
@@ -870,6 +1046,85 @@ export default function App() {
     });
   };
 
+  const saveProfile = async (displayName) => {
+    const cleanDisplayName = displayName.trim();
+    if (!cleanDisplayName || cleanDisplayName.length > 60) {
+      throw new Error("Display name must be between 1 and 60 characters.");
+    }
+    if (!auth?.currentUser || auth.currentUser.isAnonymous) {
+      throw new Error("Sign in to a teacher account before saving profile details.");
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await updateProfile(auth.currentUser, { displayName: cleanDisplayName });
+      setUser({ ...auth.currentUser });
+    } catch (profileError) {
+      setError(`Could not save your profile: ${profileError?.message ?? "unknown authentication error"}`);
+      throw profileError;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const changeAccountPassword = async (currentPassword, newPassword) => {
+    const currentUser = auth?.currentUser;
+    if (!currentUser || currentUser.isAnonymous || !currentUser.email) {
+      throw new Error("Sign in to a teacher account before changing its password.");
+    }
+    if (newPassword.length < 8) throw new Error("New password must be at least 8 characters.");
+    setBusy(true);
+    setError("");
+    try {
+      const credential = EmailAuthProvider.credential(currentUser.email, currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+      await updatePassword(currentUser, newPassword);
+    } catch (passwordError) {
+      if (passwordError?.code === "auth/wrong-password" || passwordError?.code === "auth/invalid-credential") {
+        throw new Error("The current password is incorrect.", { cause: passwordError });
+      }
+      if (passwordError?.code === "auth/weak-password") {
+        throw new Error("Choose a stronger password that meets Firebase's password policy.", { cause: passwordError });
+      }
+      throw new Error(`Could not change your password: ${passwordError?.message ?? "unknown authentication error"}`, { cause: passwordError });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const endGuestSession = async () => {
+    if (!user?.isAnonymous || !auth?.currentUser || auth.currentUser.uid !== user.uid) {
+      throw new Error("The guest session is no longer active.");
+    }
+    if (classesLoadedUid !== user.uid) {
+      throw new Error("Wait for the guest class data to finish loading, then try again.");
+    }
+
+    setBusy(true);
+    setError("");
+    try {
+      const removals = {};
+      for (const classItem of classes) {
+        removals[`owners/${user.uid}/classes/${classItem.id}`] = null;
+        removals[`publicClasses/${classItem.id}`] = null;
+        removals[`sessionTokens/${classItem.id}`] = null;
+        removals[`checkins/${classItem.id}`] = null;
+      }
+      if (Object.keys(removals).length) await update(ref(database), removals);
+      await deleteUser(auth.currentUser);
+      setView("home");
+    } catch (endError) {
+      throw new Error(`Could not end the guest session safely: ${endError?.message ?? "unknown error"}`, { cause: endError });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openClass = (classId) => {
+    setSelectedClassId(classId);
+    navigate("classes");
+  };
+
   if (authStatus === "loading") {
     return <main className="welcome-page"><section className="welcome-sheet"><h1>Here!</h1><p>Connecting…</p></section></main>;
   }
@@ -887,25 +1142,47 @@ export default function App() {
       />
     );
   }
-  if (user?.isAnonymous) {
+  if (!user) {
     return (
-      <>
-        {error && <p className="firebase-error global-error" role="alert">{error}</p>}
-        <GuestWorkspace
-          user={user}
-          classes={classesLoadedUid === user.uid ? classes : []}
-          records={recordsClassId === selectedClassId ? records : []}
-          selectedClass={selectedClass}
-          selectedClassId={selectedClassId}
-          onSelectClass={setSelectedClassId}
-          onCreateClass={createClass}
-          onUpdateClass={updateClass}
-          onDeleteClass={deleteClass}
-          onRefreshCode={refreshCode}
-          onError={setError}
-          onSignOut={handleSignOut}
-          dataLoading={classesLoadedUid !== user.uid}
-=======
+      <WelcomePage
+        view={view}
+        setView={(nextView) => { setError(""); setView(nextView); }}
+        onSubmit={submitCredentials}
+        onGuest={continueAsGuest}
+        busy={busy}
+        error={error}
+        available={authAvailable}
+      />
+    );
+  }
+
+  if (user.isAnonymous) {
+    return (
+      <ClassWorkspace
+        user={user}
+        classes={classesLoadedUid === user.uid ? classes : []}
+        records={recordsUid === user.uid && recordsClassId === selectedClassId ? records : []}
+        selectedClass={selectedClass}
+        selectedClassId={selectedClassId}
+        onSelectClass={setSelectedClassId}
+        onCreateClass={createClass}
+        onUpdateClass={updateClass}
+        onDeleteClass={deleteClass}
+        onRefreshCode={refreshCode}
+        onError={setError}
+        onCreateAccount={() => { setError(""); setView("signup"); }}
+        onEndGuest={endGuestSession}
+        guestSignup={view === "signup"}
+        onSignupSubmit={submitCredentials}
+        onSignupBack={() => { setError(""); setView("home"); }}
+        busy={busy}
+        error={error}
+        available={authAvailable}
+        dataLoading={classesLoadedUid !== user.uid}
+      />
+    );
+  }
+
   return (
     <div className="app-shell">
       <header className="app-header">
@@ -914,57 +1191,47 @@ export default function App() {
           <span>QRise</span>
         </a>
         <Navigation page={page} onNavigate={navigate} />
-        <span className="header-caption">Your morning, reimagined</span>
+        <ProfileMenu
+          user={user}
+          classes={classesLoadedUid === user.uid ? classes : []}
+          onNavigate={navigate}
+          onOpenClass={openClass}
+        />
       </header>
       <main className="app-main" data-page={page}>
-        {storageError && <p className="storage-alert" role="alert">{storageError}</p>}
-        {qrStorageError && <p className="storage-alert" role="alert">{qrStorageError}</p>}
-        {page === "checkin" ? (
-          <CheckInPage route={checkinRoute} onRouteChange={changeCheckinRoute} />
-        ) : page === "qr" ? (
-          <QrSetup
-            alarms={alarms}
-            qrCodes={qrCodes}
-            onCreate={createQrCode}
-            onPrint={setPrintingCode}
-            printingCode={printingCode}
+        {error && page !== "account" && <p className="firebase-error global-error" role="alert">{error}</p>}
+        {page === "classes" ? (
+          <ClassWorkspace
+            user={user}
+            classes={classesLoadedUid === user.uid ? classes : []}
+            records={recordsUid === user.uid && recordsClassId === selectedClassId ? records : []}
+            selectedClass={selectedClass}
+            selectedClassId={selectedClassId}
+            onSelectClass={setSelectedClassId}
+            onCreateClass={createClass}
+            onUpdateClass={updateClass}
+            onDeleteClass={deleteClass}
+            onRefreshCode={refreshCode}
+            onError={setError}
+            dataLoading={classesLoadedUid !== user.uid}
+          />
+        ) : page === "account" ? (
+          <AccountPage
+            user={user}
+            classes={classesLoadedUid === user.uid ? classes : []}
+            onSaveProfile={saveProfile}
+            onChangePassword={changeAccountPassword}
+            onSignOut={handleSignOut}
+            onOpenClass={openClass}
+            busy={busy}
+            error={error}
+            onError={setError}
           />
         ) : (
-          <>
-            {page === "home" && <HomeDashboard alarms={alarms} onOpenCheckIn={() => navigate("checkin")} />}
-            <AlarmManagement alarms={alarms} onChange={updateAlarms} />
-          </>
+          <HomeDashboard onOpenClasses={() => navigate("classes")} />
         )}
-        <AlarmSystem
-          alarms={alarms}
-          onOneShotFired={disableAlarms}
-          onFailsafe={disableAlarms}
-          scanAndVerify={scanAndVerify}
->>>>>>> 26ce73e83a285273d0ade50f5abe4a41945b6f67
-        />
-      </>
-    );
-  }
-  if (user) {
-    return (
-      <TeacherPage
-        user={user}
-        onSignOut={handleSignOut}
-        onContinueAsGuest={continueAsGuest}
-        busy={busy}
-        error={error}
-      />
-    );
-  }
-  return (
-    <WelcomePage
-      view={view}
-      setView={(nextView) => { setError(""); setView(nextView); }}
-      onSubmit={submitCredentials}
-      onGuest={continueAsGuest}
-      busy={busy}
-      error={error}
-      available={authAvailable}
-    />
+        <footer className="app-footer">QRise · Plan a better morning</footer>
+      </main>
+    </div>
   );
 }

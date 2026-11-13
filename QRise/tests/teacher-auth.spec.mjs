@@ -17,6 +17,7 @@ test.describe("account entry", () => {
     await createAccount.click();
 
     await expect(page.getByRole("heading", { name: "Create teacher account" })).toBeVisible();
+    await expect(page.getByLabel("Display name")).toHaveAttribute("maxlength", "60");
     await expect(page.getByLabel("Username")).toHaveAttribute("pattern", "[A-Za-z0-9_-]{3,24}");
     await expect(page.getByLabel("Password")).toHaveAttribute("minlength", "8");
     await expect(page.getByText(/Usernames are unique regardless of capitalization/)).toBeVisible();
