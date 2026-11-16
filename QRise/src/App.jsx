@@ -246,6 +246,10 @@ function StudentCheckInPage({ authStatus, user }) {
       setError("Please answer the discussion prompt before checking in.");
       return;
     }
+    if (classInfo?.requireStudentId && !student.studentId.trim()) {
+      setError("Please enter your student ID before checking in.");
+      return;
+    }
     try {
       const newCheckIn = push(ref(database, `checkins/${classId}`));
       if (!newCheckIn.key) throw new Error("Firebase did not create an attendance record ID.");
@@ -310,16 +314,18 @@ function StudentCheckInPage({ authStatus, user }) {
               required
             />
           </label>
-          <label>
-            Student ID
-            <input
-              autoComplete="off"
-              value={student.studentId}
-              onChange={(event) => setStudent((current) => ({ ...current, studentId: event.target.value }))}
-              maxLength={80}
-              required
-            />
-          </label>
+          {classInfo?.requireStudentId && (
+            <label>
+              Student ID
+              <input
+                autoComplete="off"
+                value={student.studentId}
+                onChange={(event) => setStudent((current) => ({ ...current, studentId: event.target.value }))}
+                maxLength={80}
+                required
+              />
+            </label>
+          )}
           {classInfo?.prompt && (
             <label>
               <span className="student-prompt">{classInfo.prompt}</span>
@@ -709,6 +715,7 @@ function ClassWorkspace({
                     try {
                       const prompt = event.currentTarget.elements.namedItem("prompt").value.trim();
                       const requireDiscussionResponse = event.currentTarget.elements.namedItem("requireDiscussionResponse").checked;
+                      const requireStudentId = event.currentTarget.elements.namedItem("requireStudentId").checked;
                       const graceEnabled = event.currentTarget.elements.namedItem("graceEnabled").checked;
                       const graceValue = Number(event.currentTarget.elements.namedItem("graceMinutes").value);
                       const meetingDays = [...event.currentTarget.querySelectorAll('input[name="meetingDay"]:checked')]
@@ -728,6 +735,7 @@ function ClassWorkspace({
                         meetingTime: event.currentTarget.elements.namedItem("meetingTime").value,
                         prompt,
                         requireDiscussionResponse,
+                        requireStudentId,
                         graceMinutes: graceEnabled ? graceValue : 0,
                         recurring: recurringEnabled,
                         meetingDays: meetingDays.join(","),
@@ -790,6 +798,14 @@ function ClassWorkspace({
                       defaultChecked={Boolean(selectedClass.requireDiscussionResponse)}
                     />
                     Require students to answer the discussion prompt
+                  </label>
+                  <label className="setting-toggle">
+                    <input
+                      name="requireStudentId"
+                      type="checkbox"
+                      defaultChecked={Boolean(selectedClass.requireStudentId)}
+                    />
+                    Require students to provide a student ID
                   </label>
                   <label className="setting-toggle">
                     <input
@@ -1120,6 +1136,7 @@ export default function App() {
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
       prompt: "",
       requireDiscussionResponse: false,
+      requireStudentId: false,
       graceMinutes: 5,
       sessionCode: generateCode(),
     };
@@ -1133,6 +1150,7 @@ export default function App() {
         meetingTime: classItem.meetingTime,
         timeZone: classItem.timeZone,
         requireDiscussionResponse: false,
+        requireStudentId: false,
         graceMinutes: 5,
         recurring: false,
         meetingDays: "",
@@ -1160,6 +1178,7 @@ export default function App() {
         timeZone,
         prompt: changes.prompt,
         requireDiscussionResponse: changes.requireDiscussionResponse,
+        requireStudentId: changes.requireStudentId,
         graceMinutes: changes.graceMinutes,
         recurring: changes.recurring,
         meetingDays: changes.meetingDays,
@@ -1171,6 +1190,7 @@ export default function App() {
       [`publicClasses/${classId}/meetingTime`]: changes.meetingTime,
       [`publicClasses/${classId}/timeZone`]: timeZone,
       [`publicClasses/${classId}/requireDiscussionResponse`]: changes.requireDiscussionResponse,
+      [`publicClasses/${classId}/requireStudentId`]: changes.requireStudentId,
       [`publicClasses/${classId}/graceMinutes`]: changes.graceMinutes,
       [`publicClasses/${classId}/recurring`]: changes.recurring,
       [`publicClasses/${classId}/meetingDays`]: changes.meetingDays,

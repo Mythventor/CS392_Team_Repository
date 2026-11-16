@@ -18,6 +18,7 @@ test.describe("guest class workspace", () => {
 
     await page.getByRole("button", { name: "Class settings" }).click();
     await expect(page.locator(".meeting-days")).toHaveCount(0);
+    await expect(page.getByLabel("Require students to provide a student ID")).not.toBeChecked();
     await page.getByLabel("This class meets on a recurring weekly schedule").check();
     await expect(page.locator(".meeting-days")).toBeVisible();
     await page.getByLabel("This class meets on a recurring weekly schedule").uncheck();
@@ -25,6 +26,7 @@ test.describe("guest class workspace", () => {
     await expect(page.getByLabel("Grace period (minutes)")).toHaveValue("5");
     await page.getByLabel("Discussion prompt").fill("What did you learn?");
     await page.getByLabel("Require students to answer the discussion prompt").check();
+    await page.getByLabel("Require students to provide a student ID").check();
     await page.getByLabel("Grace period (minutes)").fill("8");
     await page.getByRole("button", { name: "Save settings" }).click();
 
@@ -46,7 +48,12 @@ test.describe("guest class workspace", () => {
 
     await page.getByRole("button", { name: "Class settings" }).click();
     await expect(page.getByLabel("Require students to answer the discussion prompt")).toBeChecked();
+    await expect(page.getByLabel("Require students to provide a student ID")).toBeChecked();
     await expect(page.getByLabel("Grace period (minutes)")).toHaveValue("8");
+    await page.getByLabel("Require students to provide a student ID").uncheck();
+    await page.getByRole("button", { name: "Save settings" }).click();
+    await page.getByRole("button", { name: "Class settings" }).click();
+    await expect(page.getByLabel("Require students to provide a student ID")).not.toBeChecked();
   });
 
   test("converts a guest session into an account without losing its class", async ({ page }) => {
