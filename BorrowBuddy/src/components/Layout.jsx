@@ -1,18 +1,18 @@
 import { useEffect } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/useAuth";
-import { pendingIncomingCount } from "../borrowing/model";
-import { useMyLoans } from "../borrowing/useLoans";
-import "../borrowing/Borrowing.css";
+import { pendingIncomingCount } from "../deals/model";
+import { useMyDeals } from "../deals/useDeals";
+import "../deals/Deals.css";
 import { Avatar } from "./Avatar";
 import { Icon } from "./icons";
 import "./Layout.css";
 
 export function Logo() {
   return (
-    <Link to="/" className="logo" aria-label="BorrowBuddy home">
+    <Link to="/" className="logo" aria-label="Passdown home">
       <img src="/favicon.svg" alt="" width="30" height="30" />
-      <span>BorrowBuddy</span>
+      <span>Passdown</span>
     </Link>
   );
 }
@@ -41,7 +41,7 @@ function BottomTab({ to, icon, end, badge, children }) {
   );
 }
 
-// Requests from other people that are waiting for this person to accept or decline.
+// Offers from other people that are waiting for this person to accept or decline.
 function WaitingBadge({ count }) {
   if (!count) return null;
   return <span className="nav-badge" aria-label={`${count} waiting`}>{count}</span>;
@@ -50,8 +50,8 @@ function WaitingBadge({ count }) {
 export function Layout() {
   const { pathname } = useLocation();
   const { user } = useAuth();
-  const loans = useMyLoans(user?.uid);
-  const waiting = user ? pendingIncomingCount(loans.data, user.uid) : 0;
+  const deals = useMyDeals(user?.uid);
+  const waiting = user ? pendingIncomingCount(deals.data, user.uid) : 0;
 
   // Opening a new page should start at the top, not wherever the last page was scrolled.
   useEffect(() => {
@@ -67,9 +67,9 @@ export function Layout() {
           <Logo />
           <nav className="desktop-nav" aria-label="Main">
             <NavLink to="/browse" className="nav-link">Browse</NavLink>
-            <NavLink to="/list" className="nav-link">List an item</NavLink>
+            <NavLink to="/list" className="nav-link">Sell an item</NavLink>
             {user && <NavLink to="/my-listings" className="nav-link">My listings</NavLink>}
-            {user && <NavLink to="/loans" className="nav-link">Loans<WaitingBadge count={waiting} /></NavLink>}
+            {user && <NavLink to="/deals" className="nav-link">Deals<WaitingBadge count={waiting} /></NavLink>}
           </nav>
           <AccountLink />
         </div>
@@ -82,15 +82,15 @@ export function Layout() {
       <footer className="site-footer">
         <div className="container site-footer-inner">
           <Logo />
-          <p>Borrow what you need from students on your campus.</p>
+          <p>Buy and sell with students on your campus, especially at move-out.</p>
         </div>
       </footer>
 
       <nav className="bottom-nav" aria-label="Main">
         <BottomTab to="/" icon="home" end>Home</BottomTab>
         <BottomTab to="/browse" icon="search">Browse</BottomTab>
-        <BottomTab to="/list" icon="plus">List</BottomTab>
-        {user && <BottomTab to="/loans" icon="loans" badge={<WaitingBadge count={waiting} />}>Loans</BottomTab>}
+        <BottomTab to="/list" icon="plus">Sell</BottomTab>
+        {user && <BottomTab to="/deals" icon="deals" badge={<WaitingBadge count={waiting} />}>Deals</BottomTab>}
         <BottomTab to={user ? "/profile" : "/signin"} icon="user">{user ? "Profile" : "Sign in"}</BottomTab>
       </nav>
     </div>

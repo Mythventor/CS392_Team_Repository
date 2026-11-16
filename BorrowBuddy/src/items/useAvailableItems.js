@@ -8,7 +8,7 @@ function itemFromSnapshot(snapshot) {
   return { id: snapshot.id, ...data, createdAt: data.createdAt?.toMillis?.() ?? 0 };
 }
 
-// Live list of items people can borrow right now, newest first.
+// Live list of items people can buy right now, newest first.
 export function useAvailableItems() {
   const [state, setState] = useState({ items: [], loading: true, error: null });
 

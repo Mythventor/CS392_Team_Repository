@@ -69,7 +69,7 @@ export function browseUrl(filters = {}) {
 }
 
 function searchableText(item) {
-  return [item.title, item.description, categoryLabel(item.category), schoolLabel(item.school)]
+  return [item.title, item.description, categoryLabel(item.category), schoolLabel(item.school), item.price === 0 ? "free" : ""]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();

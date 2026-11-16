@@ -91,11 +91,6 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
-.listing-borrow-note {
-  background: var(--surface-sunk);
-  padding: 16px;
-  border-radius: var(--radius-sm);
-}
 .listing-heading {
   display: flex;
   align-items: center;
@@ -129,4 +124,11 @@
     align-items: flex-start;
     flex-direction: column;
   }
+}
+.listing-price {
+  margin: 4px 0 2px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.7rem;
+  font-weight: 700;
 }

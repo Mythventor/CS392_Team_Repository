@@ -12,7 +12,7 @@ function Results({ items, filtered, loading, error, onClear }) {
     return (
       <div className="empty-state">
         <h3>Nothing listed yet</h3>
-        <p>Got something you don't use every day? Be the first to lend it.</p>
+        <p>Moving out or decluttering? Be the first to pass something down.</p>
         <Link to="/list" className="button button-primary">List an item</Link>
       </div>
     );

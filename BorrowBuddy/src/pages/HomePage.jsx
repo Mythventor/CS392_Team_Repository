@@ -8,9 +8,9 @@ import { useAvailableItems } from "../items/useAvailableItems";
 import "./HomePage.css";
 
 const STEPS = [
-  { title: "Find it nearby", text: "Search what students on your campus are lending, or filter by category." },
-  { title: "Ask to borrow", text: "Pick the dates you need it and send the owner a request." },
-  { title: "Pick up and return", text: "Agree on a meetup, use it, and bring it back when you're done." },
+  { title: "List it in a minute", text: "Snap a photo, set a price or mark it free, and add a pick-up-by date if you're moving out." },
+  { title: "Make an offer", text: "Ask for it at the asking price or offer less. The seller picks one buyer, so it's reserved just for you." },
+  { title: "Meet and pay in person", text: "Agree on a campus meetup in the app's messages, check the item, then pay the seller face to face." },
 ];
 
 const HERO_TILES = ["tools", "books", "electronics", "outdoors", "kitchen", "events"];
@@ -50,8 +50,8 @@ function RecentItems() {
     return (
       <div className="empty-state">
         <h3>Nothing listed yet</h3>
-        <p>Got something you don't use every day? Be the first to lend it.</p>
-        <Link to="/list" className="button button-primary">List an item</Link>
+        <p>Moving out or decluttering? Be the first to pass something down.</p>
+        <Link to="/list" className="button button-primary">Sell an item</Link>
       </div>
     );
   }
@@ -70,9 +70,9 @@ export function HomePage() {
       <section className="hero">
         <div className="container hero-inner">
           <div className="hero-copy">
-            <h1>Why buy it when someone on campus has one?</h1>
+            <h1>Graduating? Pass it down.</h1>
             <p className="hero-lede">
-              Borrow tools, textbooks, gear, and more from the students around you.
+              Buy and sell used furniture, textbooks, and dorm gear with the students around you. No shipping, no strangers, and payment happens in person.
             </p>
             <HeroSearch />
           </div>
@@ -126,11 +126,11 @@ export function HomePage() {
       <section className="container home-section">
         <div className="home-cta">
           <div>
-            <h2>Got something sitting in your closet?</h2>
-            <p>Lend it to someone who needs it this week.</p>
+            <h2>Moving out soon?</h2>
+            <p>Sell your mini fridge, lamp, or textbooks to someone staying on campus.</p>
           </div>
           <Link to={user ? "/list" : "/signin?next=/list"} className="button button-light">
-            List an item
+            Sell an item
           </Link>
         </div>
       </section>
