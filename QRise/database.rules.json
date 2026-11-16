@@ -33,6 +33,9 @@
         "requireDiscussionResponse": {
           ".validate": "newData.isBoolean()"
         },
+        "requireStudentId": {
+          ".validate": "newData.isBoolean()"
+        },
         "graceMinutes": {
           ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 60"
         },
