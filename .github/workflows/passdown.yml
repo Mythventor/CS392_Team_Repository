@@ -5,12 +5,12 @@ name: Passdown
 on:
   pull_request:
     paths:
-      - 'Passdown/**'
+      - 'apps/passdown/**'
       - '.github/workflows/passdown.yml'
   push:
     branches: [main]
     paths:
-      - 'Passdown/**'
+      - 'apps/passdown/**'
       - '.github/workflows/passdown.yml'
   workflow_dispatch:
 
@@ -27,7 +27,7 @@ env:
 
 defaults:
   run:
-    working-directory: Passdown
+    working-directory: apps/passdown
 
 jobs:
   check:
@@ -38,9 +38,9 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
-          cache-dependency-path: Passdown/package-lock.json
+          cache-dependency-path: apps/passdown/package-lock.json
 
       # The Firestore emulator used by the rules tests needs Java 21 or newer.
       - uses: actions/setup-java@v6
@@ -74,7 +74,7 @@ jobs:
     steps:
       - name: Check for deploy credentials
         id: credentials
-        # Runs before checkout, so Passdown/ doesn't exist yet.
+        # Runs before checkout, so apps/passdown/ doesn't exist yet.
         working-directory: .
         env:
           SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_BORROWBUDDY }}
@@ -92,9 +92,9 @@ jobs:
       - uses: actions/setup-node@v7
         if: steps.credentials.outputs.ready == 'true'
         with:
-          node-version: '22'
+          node-version: '24'
           cache: npm
-          cache-dependency-path: Passdown/package-lock.json
+          cache-dependency-path: apps/passdown/package-lock.json
 
       - uses: google-github-actions/auth@v3
         if: steps.credentials.outputs.ready == 'true'

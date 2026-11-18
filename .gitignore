@@ -1,0 +1,12 @@
+# Shared local files and generated output
+**/node_modules/
+**/dist/
+**/dist-ssr/
+**/.firebase/
+**/playwright-report/
+**/test-results/
+*.log
+*.local
+.DS_Store
+.idea/
+.vscode/
