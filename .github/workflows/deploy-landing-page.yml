@@ -1,10 +1,11 @@
-name: Deploy QRise introduction to GitHub Pages
+name: Deploy project introductions to GitHub Pages
 
 on:
   push:
     branches: [main]
     paths:
       - 'QRise_Ads/**'
+      - 'Passdown_Ad/**'
       - '.github/workflows/deploy-landing-page.yml'
   workflow_dispatch:
 
@@ -31,13 +32,14 @@ jobs:
       - uses: actions/configure-pages@v5
       - run: npm ci
       - run: npm run build
-      - name: Place landing page in its public subdirectory
+      - name: Assemble both introduction pages
         run: |
-          mkdir -p "$RUNNER_TEMP/qrise-pages/QRise_Ad"
-          cp -R dist/. "$RUNNER_TEMP/qrise-pages/QRise_Ad/"
+          mkdir -p "$RUNNER_TEMP/project-pages/QRise_Ad" "$RUNNER_TEMP/project-pages/Passdown_Ad"
+          cp -R dist/. "$RUNNER_TEMP/project-pages/QRise_Ad/"
+          cp ../Passdown_Ad/index.html ../Passdown_Ad/styles.css ../Passdown_Ad/script.js ../Passdown_Ad/favicon.svg "$RUNNER_TEMP/project-pages/Passdown_Ad/"
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ runner.temp }}/qrise-pages
+          path: ${{ runner.temp }}/project-pages
   deploy:
     needs: build
     runs-on: ubuntu-latest
@@ -46,7 +48,7 @@ jobs:
       id-token: write
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}QRise_Ad/
+      url: ${{ steps.deployment.outputs.page_url }}Passdown_Ad/
     steps:
       - name: Deploy
         id: deployment

@@ -52,6 +52,6 @@ Check the three walkthrough buttons, FAQ expansion, anchor navigation, and app U
 
 Live introduction: https://mythventor.github.io/CS392_Team_Repository/QRise_Ad/
 
-The repository uses GitHub Actions as its Pages source. `.github/workflows/deploy-landing-page.yml` builds only `QRise_Ads` and publishes its `dist` output inside the artifact’s `QRise_Ad/` directory whenever landing-page files change on `main`. It can also be run manually from Actions. The Vite base path is `/CS392_Team_Repository/QRise_Ad/`, so local preview URLs include that path too.
+The repository uses GitHub Actions as its Pages source. `.github/workflows/deploy-landing-page.yml` builds `QRise_Ads` and publishes its `dist` output inside the artifact’s `QRise_Ad/` directory alongside the static `Passdown_Ad/` introduction. Both are deployed together whenever either introduction changes on `main`, so publishing one preserves the other. The workflow can also be run manually from Actions. The Vite base path is `/CS392_Team_Repository/QRise_Ad/`, so local preview URLs include that path too.
 
 The alarm application stays at https://qrise-cs392.web.app. GitHub Pages hosts this introduction; Google/Firebase hosts the linked app.
