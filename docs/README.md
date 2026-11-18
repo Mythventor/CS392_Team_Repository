@@ -33,7 +33,7 @@ firebase deploy --only firestore:rules,hosting --project borrowbuddy-cs392
 
 Review the relevant app README for Firebase authentication and environment setup. Project IDs, account identifiers, and CI secrets are infrastructure references; do not blindly replace them during branding changes. Here! access requires permission to its Firebase project.
 
-The [Passdown workflow](../.github/workflows/passdown.yml) runs lint, unit tests, Firestore emulator tests, and a production build. Pushes affecting its source on `main` deploy rules and hosting when the `FIREBASE_SERVICE_ACCOUNT_BORROWBUDDY` secret is available. This legacy secret name is intentional. Here! currently uses manual Firebase deployment; this repository does not configure an automatic Here! production deploy.
+The [Passdown workflow](../.github/workflows/passdown.yml) runs lint, unit and React component tests, Firestore emulator tests, and a production build. Pushes affecting its source on `main` deploy rules and hosting when the `FIREBASE_SERVICE_ACCOUNT_BORROWBUDDY` secret is available. This legacy secret name is intentional. Here! currently uses manual Firebase deployment; this repository does not configure an automatic Here! production deploy.
 
 ## Introductions on GitHub Pages
 

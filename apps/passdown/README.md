@@ -52,7 +52,10 @@ Deploy only Firestore rules and Hosting: `firebase deploy --only firestore:rules
 | --- | --- |
 | `npm run dev` | Runs the app against the project in `.env.local` |
 | `npm run dev:emulator` | Runs the app against local emulators with sample items |
-| `npm test` | Runs unit tests for search, filters, profiles, listings, and deals |
+| `npm test` | Runs all 31 unit tests and 36 React component tests |
+| `npm run test:unit` | Runs domain-logic tests with Node’s test runner |
+| `npm run test:components` | Runs the React component suite once |
+| `npm run test:components:watch` | Watches and reruns React component tests during development |
 | `npm run test:rules` | Tests `firestore.rules` on the Firestore emulator |
 | `npm run lint` | Checks the code with ESLint |
 | `npm run build` | Builds the production site into `dist/` |
@@ -135,3 +138,11 @@ The rules check who can make each status change, that a change touches only its 
 `senderId`, `senderName`, `text` (1–1000 characters), `createdAt`. Only the two people in the deal can read or send messages, and only as themselves.
 
 Deal rules are tested in `tests/rules/deals.rules.test.mjs` (`npm run test:rules`). Old `requests` and `bookedDays` data from BorrowBuddy is no longer read and its rules were removed, so it's closed by default.
+
+## React component tests
+
+`tests/components/` uses Vitest, React Testing Library, user-event, and jsdom to render the real screens and exercise them through accessible labels, clicks, typing, uploads, and navigation. The suite has **36 cases** covering sign-in/profile edits (7), browsing (4), creating/editing listings (7), buying/making offers (7), and deal management/pickup/messages (11). Error recovery, validation, duplicate-submit protection, role-specific actions, and signed-out return paths are included.
+
+Firebase subscriptions and writes are mocked at the data boundary, and authentication is supplied through the real AuthContext. Routing, domain validation, forms, and child components run normally. Tests make no live Google, Firebase, or Cloudinary requests. The component suite verifies UI behavior; the separate 24 Firestore emulator tests verify backend authorization and transaction rules.
+
+`npm test` runs unit and component tests together in CI. `npm run test:rules` remains a separate emulator command. There are **91 automated cases** across the three suites: 31 unit, 36 component, and 24 security-rule tests.

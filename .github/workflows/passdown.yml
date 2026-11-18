@@ -58,7 +58,8 @@ jobs:
       - run: npm install --global firebase-tools@${{ env.FIREBASE_TOOLS_VERSION }}
 
       - run: npm run lint
-      - run: npm test
+      - name: Unit and React component tests
+        run: npm test
       - name: Test Firestore security rules
         run: npm run test:rules
       - run: npm run build

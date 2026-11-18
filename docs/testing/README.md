@@ -18,7 +18,7 @@ From `apps/here/`: run `npm test`, `npm run lint`, and `npm run build`. Run `npm
 
 ## Passdown
 
-From `apps/passdown/`: run `npm test`, `npm run lint`, and `npm run build`. Run `npm run test:rules` for Firestore security tests with the `demo-passdown` emulator project (Firebase CLI and JDK 21+ required).
+From `apps/passdown/`: run `npm test` (unit + React component tests), `npm run lint`, and `npm run build`. Run `npm run test:rules` for Firestore security tests with the `demo-passdown` emulator project (Firebase CLI and JDK 21+ required).
 
 | File | Cases | Coverage |
 | --- | ---: | --- |
@@ -29,9 +29,23 @@ From `apps/passdown/`: run `npm test`, `npm run lint`, and `npm run build`. Run 
 | [tests/rules/deals.rules.test.mjs](../../apps/passdown/tests/rules/deals.rules.test.mjs) | 14 | Offer validation, participant access, atomic item reservations, cancellations, sale completion, pickup confirmation, and messages. |
 | [tests/rules/firestore.rules.test.mjs](../../apps/passdown/tests/rules/firestore.rules.test.mjs) | 10 | Profile ownership and validation, public browsing, listing ownership, and default-deny access. |
 
-Passdown currently has **55 tests**: 31 unit cases and 24 Firestore rule cases. Negative security tests deliberately produce permission-denied emulator logs; success means the test runner exits with zero failures.
+Passdown currently has **91 tests**: 31 unit cases, 36 React component cases, and 24 Firestore rule cases. Negative security tests deliberately produce permission-denied emulator logs; success means the test runner exits with zero failures.
 
-These suites test domain logic and Firebase rules. They do not render React components. In particular, the old lending/loan tests are no longer part of the resale app.
+The table above covers domain logic and Firebase rules. The React component suite below renders the actual screens. The old lending/loan tests are no longer part of the resale app.
+
+### React component coverage
+
+Run `npm run test:components` for a single pass, or `npm run test:components:watch` while developing. `npm run test:unit` runs only the original Node tests. The CI workflow runs `npm test`, which includes both unit and component suites.
+
+| Component suite | Cases | User flows |
+| --- | ---: | --- |
+| [account.test.jsx](../../apps/passdown/tests/components/account.test.jsx) | 7 | Google sign-in, busy state, safe return navigation, errors/retry, cancelled popup, profile access, validation/save, sign-out |
+| [browse.test.jsx](../../apps/passdown/tests/components/browse.test.jsx) | 4 | Combined search/school/category filters, shared URL state, clearing filters, item navigation, empty inventory, read errors |
+| [listings.test.jsx](../../apps/passdown/tests/components/listings.test.jsx) | 7 | Sign-in guard, required-field errors, photo preview/publish, repeat-submit protection, failed upload/retry, edits with an existing photo, owner-only editing |
+| [offers.test.jsx](../../apps/passdown/tests/components/offers.test.jsx) | 7 | Sign-in return path, asking/lower/free offers, excessive-price validation, existing offers, reserved items, failure/retry |
+| [deals.test.jsx](../../apps/passdown/tests/components/deals.test.jsx) | 11 | Buying/selling tabs, seller accept/decline/complete, unavailable-item blocker, buyer withdrawal confirmation, pickup validation/proposal/confirmation, messaging/retry, unavailable deals |
+
+Tests use Vitest + jsdom, React Testing Library, and user-event. The real screens, form validation, child components, AuthContext, and MemoryRouter are rendered. Firebase read hooks/watchers and write services are mocked; Google sign-in/profile actions are provided through AuthContext. File uploads use local test Files and mocked object URLs. No external accounts, database writes, image uploads, or payment actions occur. These are component integration tests, not full browser/end-to-end tests or replacements for the Firestore rule suite.
 
 ## Introduction sites
 

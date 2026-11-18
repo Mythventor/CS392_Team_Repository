@@ -20,6 +20,7 @@ export default defineConfig([
   },
   {
     files: ['scripts/**', 'tests/**'],
+    rules: { 'react-refresh/only-export-components': 'off' },
     languageOptions: { globals: globals.node },
   },
 ])
