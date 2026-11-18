@@ -1,6 +1,6 @@
 // Adds sample items to the local Firestore emulator. It can't touch a real project:
 // the address is hard-coded to the emulator and the project id is a local "demo-" one.
-const BASE = "http://127.0.0.1:8080/v1/projects/demo-borrowbuddy/databases/(default)/documents/items";
+const BASE = "http://127.0.0.1:8080/v1/projects/demo-passdown/databases/(default)/documents/items";
 
 const SAMPLE_ITEMS = [
   ["drill", "Cordless power drill", "18V drill with a bit set. Great for dorm shelves.", "tools", "northwestern", "Sam Rivera", 35],

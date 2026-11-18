@@ -49,7 +49,7 @@ function sellBatch(db, id) {
 
 before(async () => {
   env = await initializeTestEnvironment({
-    projectId: "demo-borrowbuddy",
+    projectId: "demo-passdown",
     firestore: { rules: readFileSync("firestore.rules", "utf8"), host: "127.0.0.1", port: 8080 },
   });
 });

@@ -2,7 +2,7 @@
 
 Students sell (or give away) things they no longer need to other students on their campus, especially when graduating or moving out. Payment happens in person at pickup, never in the app.
 
-Passdown started as BorrowBuddy, a lending app. Peer feedback showed people didn't trust lending to strangers, so it became a resale app. It still has the parts testers liked: messages, the pickup plan, and a guarantee that an item can't be promised to two people. The Firebase project and site address (`borrowbuddy-cs392`) keep their old names. Built with React, Vite, Firebase Spark (Google sign-in, Cloud Firestore and Hosting), and Cloudinary Free for listing photos. Firebase Cloud Storage is not used.
+Passdown started as BorrowBuddy, a lending app. Peer feedback showed people didn't trust lending to strangers, so it became a resale app. It still has the parts testers liked: messages, the pickup plan, and a guarantee that an item can't be promised to two people. The Firebase project keeps its original ID (`borrowbuddy-cs392`) to preserve existing accounts and data. The app is hosted at [passdown-cs392.web.app](https://passdown-cs392.web.app). Built with React, Vite, Firebase Spark (Google sign-in, Cloud Firestore and Hosting), and Cloudinary Free for listing photos. Firebase Cloud Storage is not used.
 
 ## Try it locally
 
@@ -37,6 +37,8 @@ Set `VITE_CLOUDINARY_CLOUD_NAME` and `VITE_CLOUDINARY_UPLOAD_PRESET` in `.env.lo
 Create a dedicated unsigned image upload preset with JPG/PNG/WebP allowed formats, generated unique IDs, public ID overrides disabled, and a Passdown asset folder. Unsigned uploads cannot overwrite existing photos. Enable short-lived deletion tokens for failed-save cleanup. The app rejects files over 5 MB; this client-side limit is not a server-side access control. Cloudinary presets do not support a per-preset file-size limit.
 
 The public preset allows uploads from anyone who knows its name, independently of Firebase sign-in. For a small project, monitor the Free quota and disable the preset if abused; authenticated signed uploads would require a separate backend. Listing edits remain protected by Firestore owner rules. Photo URLs and public IDs are saved in the listing; deletion tokens are never persisted. Replaced/archived photos are retained in the Media Library for account-owner cleanup, preserving existing links without exposing an admin secret.
+
+Hosting targets the `passdown-cs392` site in `firebase.json`. The Firebase project ID and existing CI service-account secret (`FIREBASE_SERVICE_ACCOUNT_BORROWBUDDY`) remain unchanged. Both `passdown-cs392.web.app` and `passdown-cs392.firebaseapp.com` must be listed under Firebase Authentication > Settings > Authorized domains for Google sign-in.
 
 Deploy only Firestore rules and Hosting: `firebase deploy --only firestore:rules,hosting`. Build first with `npm run build`. No Firebase billing upgrade or Storage initialization is required.
 

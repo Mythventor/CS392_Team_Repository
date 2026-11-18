@@ -1,27 +1,27 @@
-# BorrowBuddy Test Specifications
+# Passdown Test Specifications
 
-This document lists every automated test in the `BorrowBuddy/` app, written in Given / When / Then form.
+This document lists every automated test in the `Passdown/` app, written in Given / When / Then form.
 
 **About the test suite**
 
-- BorrowBuddy has **no React component tests**: there are no `@testing-library/react` renders, `fireEvent` or `userEvent` calls. The tests check the plain JavaScript logic behind the React screens (search and filters, form validation, borrowing rules, photo uploads) and the Firestore security rules that guard the database.
+- Passdown has **no React component tests**: there are no `@testing-library/react` renders, `fireEvent` or `userEvent` calls. The tests check the plain JavaScript logic behind the React screens (search and filters, form validation, borrowing rules, photo uploads) and the Firestore security rules that guard the database.
 - All tests use Node's built-in test runner (`node:test`). None of them use `describe` blocks, so every test sits at the top level of its file. The "Test Suite / Describe" column therefore shows the file's top level.
-- **Unit tests** (`BorrowBuddy/tests/*.test.mjs`) run with `npm test`.
-- **Security rule tests** (`BorrowBuddy/tests/rules/*.test.mjs`) run with `npm run test:rules`, which starts a local Firestore emulator. Before each rules test the database is wiped. "Sam" is the item owner, "Alex" the borrower and "Jo" an unrelated student.
+- **Unit tests** (`Passdown/tests/*.test.mjs`) run with `npm test`.
+- **Security rule tests** (`Passdown/tests/rules/*.test.mjs`) run with `npm run test:rules`, which starts a local Firestore emulator. Before each rules test the database is wiped. "Sam" is the item owner, "Alex" the borrower and "Jo" an unrelated student.
 
 | File | Tests |
 |---|---|
-| `BorrowBuddy/tests/model.test.mjs` | 13 |
-| `BorrowBuddy/tests/listings.test.mjs` | 5 |
-| `BorrowBuddy/tests/borrowing.test.mjs` | 8 |
-| `BorrowBuddy/tests/photoUpload.test.mjs` | 4 |
-| `BorrowBuddy/tests/rules/firestore.rules.test.mjs` | 10 |
-| `BorrowBuddy/tests/rules/borrowing.rules.test.mjs` | 16 |
+| `Passdown/tests/model.test.mjs` | 13 |
+| `Passdown/tests/listings.test.mjs` | 5 |
+| `Passdown/tests/borrowing.test.mjs` | 8 |
+| `Passdown/tests/photoUpload.test.mjs` | 4 |
+| `Passdown/tests/rules/firestore.rules.test.mjs` | 10 |
+| `Passdown/tests/rules/borrowing.rules.test.mjs` | 16 |
 | **Total** | **56** |
 
 ---
 
-## Item browsing and profile helpers — `BorrowBuddy/tests/model.test.mjs`
+## Item browsing and profile helpers — `Passdown/tests/model.test.mjs`
 
 Tests `src/items/model.js` (`filterItems`, `filtersFromParams`, `hasActiveFilters`, `browseUrl`, `isAvailable`, `newestFirst`) and `src/auth/profileModel.js` (`validateProfile`, `initials`, `safeNextPath`). Shared sample data: three items — a "Cordless Drill" (tools, Northwestern, description "Comes with bits"), a "Lamp for your desk" (dorm, DePaul) and a "Calculus textbook" (books, Northwestern), each with a different creation time.
 
@@ -43,7 +43,7 @@ Tests `src/items/model.js` (`filterItems`, `filtersFromParams`, `hasActiveFilter
 
 ---
 
-## Listing form validation — `BorrowBuddy/tests/listings.test.mjs`
+## Listing form validation — `Passdown/tests/listings.test.mjs`
 
 Tests `src/items/listingModel.js` (`validateListing`, `photoError`) and `isAvailable` from `src/items/model.js`. Shared sample data: a valid "Calculator" listing (electronics, Northwestern, condition Good, pickup at the University library, available 2099-01-01 to 2099-01-07).
 
@@ -57,7 +57,7 @@ Tests `src/items/listingModel.js` (`validateListing`, `photoError`) and `isAvail
 
 ---
 
-## Borrowing rules and loan dashboard — `BorrowBuddy/tests/borrowing.test.mjs`
+## Borrowing rules and loan dashboard — `Passdown/tests/borrowing.test.mjs`
 
 Tests `src/borrowing/model.js`. Shared setup: "today" is 2026-11-05; a drill listed as available from 2026-11-01 to 2026-12-31; a sample pending request from Alex (borrower) to Sam (owner) for 2026-11-10 to 2026-11-12. The maximum loan is `MAX_LOAN_DAYS` (14 days).
 
@@ -74,7 +74,7 @@ Tests `src/borrowing/model.js`. Shared setup: "today" is 2026-11-05; a drill lis
 
 ---
 
-## Photo upload to Cloudinary — `BorrowBuddy/tests/photoUpload.test.mjs`
+## Photo upload to Cloudinary — `Passdown/tests/photoUpload.test.mjs`
 
 Tests `src/items/photoUpload.js` (`uploadPhoto`, `discardUpload`). Shared setup: Cloudinary settings (cloud "test-cloud", upload preset "listings"), a small PNG file, and a sample Cloudinary reply. Network calls are replaced with fake functions so no real upload happens.
 
@@ -87,9 +87,9 @@ Tests `src/items/photoUpload.js` (`uploadPhoto`, `discardUpload`). Shared setup:
 
 ---
 
-## Profile and item security rules — `BorrowBuddy/tests/rules/firestore.rules.test.mjs`
+## Profile and item security rules — `Passdown/tests/rules/firestore.rules.test.mjs`
 
-Tests the Firestore security rules in `BorrowBuddy/firestore.rules` against the local emulator. Shared data: a valid profile for Sam (Northwestern, empty bio) and a valid drill item owned by Sam.
+Tests the Firestore security rules in `Passdown/firestore.rules` against the local emulator. Shared data: a valid profile for Sam (Northwestern, empty bio) and a valid drill item owned by Sam.
 
 | Test Suite / Describe | Test Name | Given (Initial State) | When (Action / Event) | Then (Expected Outcome) |
 |---|---|---|---|---|
@@ -106,7 +106,7 @@ Tests the Firestore security rules in `BorrowBuddy/firestore.rules` against the 
 
 ---
 
-## Borrowing security rules — `BorrowBuddy/tests/rules/borrowing.rules.test.mjs`
+## Borrowing security rules — `Passdown/tests/rules/borrowing.rules.test.mjs`
 
 Tests the Firestore security rules for borrow requests, booked-day locks (which prevent double bookings), pickup plans and messages. Before each test the database is wiped and Sam's available drill is added (listed from today to 60 days from now). A sample request is from Alex to Sam for 3 to 5 days from today. "Accepting" means changing the request to accepted and writing one booked-day lock per loan day, all in one atomic step, as the app does.
 
