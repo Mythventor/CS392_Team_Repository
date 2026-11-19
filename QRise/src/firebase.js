@@ -17,7 +17,7 @@ const missingConfig = Object.entries(firebaseConfig)
   .map(([key]) => `VITE_FIREBASE_${key.replace(/[A-Z]/g, (letter) => `_${letter}`).toUpperCase()}`);
 
 export const firebaseConfigError = missingConfig.length
-  ? `Firebase configuration is missing: ${missingConfig.join(", ")}.`
+  ? "The app isn't configured correctly right now. Please contact your instructor."
   : "";
 
 let firebaseApp = null;
