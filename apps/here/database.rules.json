@@ -72,6 +72,7 @@
     "checkins": {
       "$classId": {
         ".read": "auth != null && root.child('publicClasses').child($classId).child('ownerUid').val() === auth.uid",
+        ".write": "auth != null && root.child('publicClasses').child($classId).child('ownerUid').val() === auth.uid && !newData.exists()",
         "$checkinId": {
           ".write": "auth != null && ((root.child('publicClasses').child($classId).child('ownerUid').val() === auth.uid) || (!data.exists() && newData.child('sessionCode').val() === root.child('sessionTokens').child($classId).child('code').val()))",
           ".validate": "newData.hasChildren(['name', 'studentId', 'status', 'checkedInTime', 'sessionId', 'arrivalStatus', 'sessionCode']) && (root.child('publicClasses').child($classId).child('requireDiscussionResponse').val() !== true || (newData.child('discussionResponse').isString() && newData.child('discussionResponse').val().length > 0)) && (root.child('publicClasses').child($classId).child('requireStudentId').val() !== true || (newData.child('studentId').isString() && newData.child('studentId').val().length > 0))",

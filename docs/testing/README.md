@@ -57,11 +57,10 @@ Assemble the GitHub Pages artifact with `python3 scripts/assemble-pages.py --out
 
 [BorrowBuddy’s lending test specification](borrowbuddy-legacy.md) preserves the earlier Given/When/Then document. Its paths, loan behavior, and counts are historical and must not be used as the current Passdown test contract.
 
-## Known existing Here! browser failures
+## Known existing Here! browser issue
 
-The five-case browser suite currently reports three passes and two failures, reproduced against both the reorganized source and the unchanged pre-cleanup checkout:
+The browser suite has an ambiguous locator in the guest class-settings test:
 
 - **Guest class settings:** `getByLabel("Discussion prompt")` matches both the textarea and the requirement checkbox; the test needs an exact locator.
-- **End guest session:** deleting guest data is rejected by the Realtime Database rules, so the app remains in the guest workspace with a permission error.
 
-These issues predate the folder/name cleanup. The unit tests, production builds, and Passdown security-rule tests pass. Review guest cleanup before relying on it; an attempted end-session action can fail instead of deleting data.
+The end-session permission issue is addressed by an owner-only rule that allows deleting a class's entire check-in subtree. Deploy the updated `apps/here/database.rules.json` before relying on the fix. Its browser test could not be rerun locally because the Firebase emulator requires JDK 21 or newer; this environment has Java 8. The unit tests and production build pass.
