@@ -40,32 +40,32 @@ function authErrorMessage(error, mode) {
     case "auth/wrong-password":
       return "Username or password is incorrect.";
     case "auth/weak-password":
-      return "Choose a stronger password that meets the Firebase password policy.";
+      return "Choose a stronger password that meets the account's password requirements.";
     case "auth/operation-not-allowed":
       return mode === "guest"
-        ? "Guest access is not enabled. In Firebase Console, enable Authentication → Sign-in method → Anonymous."
-        : "Username and password sign-in is not enabled. In Firebase Console, enable Authentication → Sign-in method → Email/Password.";
+        ? "Guest access is unavailable right now. Please contact your instructor."
+        : "Teacher account access is unavailable right now. Please contact your instructor.";
     case "auth/api-key-not-valid":
     case "auth/invalid-api-key":
-      return "Firebase rejected the app's API key. Verify the key and project settings used by the deployed build.";
+      return "Sign-in is unavailable right now. Please try again later or contact your instructor.";
     case "auth/unauthorized-domain":
-      return "This website is not authorized for Firebase Authentication. Add its hostname under Authentication → Settings → Authorized domains.";
+      return "This website can't sign you in right now. Please contact your instructor.";
     case "auth/network-request-failed":
-      return "Could not reach Firebase. Check your network connection and try again.";
+      return "Couldn't connect. Check your internet connection and try again.";
     case "auth/too-many-requests":
       return "Too many attempts. Wait a little while before trying again.";
     case "auth/requires-recent-login":
       return "For your security, sign out and sign in again before trying that change.";
     default:
-      return `${mode === "signup" ? "Account creation" : mode === "guest" ? "Guest access" : "Sign-in"} failed (${error?.code ?? "unknown error"}). Please try again.`;
+      return `${mode === "signup" ? "Account creation" : mode === "guest" ? "Guest access" : "Sign-in"} couldn't be completed. Please try again.`;
   }
 }
 
 function databaseErrorMessage(error, action) {
   if (error?.code === "PERMISSION_DENIED" || error?.code === "permission-denied") {
-    return `Firebase denied ${action}. Check that database.rules.json is deployed and the signed-in user owns this class.`;
+    return `You don't have permission to ${action}. Check that you're signed in to the right account, or ask the class owner for access.`;
   }
-  return `Could not ${action}: ${error?.message ?? "unknown database error"}`;
+  return `Could not ${action}. Please try again. If the problem continues, contact your instructor.`;
 }
 
 function Navigation({ page, onNavigate }) {
@@ -250,10 +250,25 @@ function StudentCheckInPage({ authStatus, user }) {
       setError("Please enter your student ID before checking in.");
       return;
     }
+    const name = student.name.trim();
+    if (!name) {
+      setError("Please enter your name.");
+      return;
+    }
+    const checkedInAt = Date.now();
+    const arrivalStatus = classAttendanceStatus(
+      checkedInAt,
+      classInfo?.meetingTime,
+      classInfo?.graceMinutes ?? 5,
+      classInfo?.timeZone,
+    );
+    if (arrivalStatus === "Unknown") {
+      setError("This class's meeting time or time zone is invalid. Ask your instructor to check the class settings.");
+      return;
+    }
     try {
       const newCheckIn = push(ref(database, `checkins/${classId}`));
-      if (!newCheckIn.key) throw new Error("Firebase did not create an attendance record ID.");
-      const checkedInAt = Date.now();
+      if (!newCheckIn.key) throw new Error("Could not prepare your check-in. Please try again.");
       const checkedInTime = new Intl.DateTimeFormat("en-GB", {
         hour: "2-digit",
         minute: "2-digit",
@@ -265,17 +280,12 @@ function StudentCheckInPage({ authStatus, user }) {
         throw new Error("This class's recurring schedule is incomplete. Ask your instructor to update its settings.");
       }
       const checkInRecord = {
-        name: student.name.trim(),
+        name,
         studentId: student.studentId.trim(),
         status: "Present",
         checkedInTime,
         sessionId,
-        arrivalStatus: classAttendanceStatus(
-          checkedInAt,
-          classInfo?.meetingTime,
-          classInfo?.graceMinutes ?? 5,
-          classInfo?.timeZone,
-        ),
+        arrivalStatus,
         sessionCode: code,
       };
       if (classInfo?.prompt && response) checkInRecord.discussionResponse = response;
@@ -283,7 +293,7 @@ function StudentCheckInPage({ authStatus, user }) {
       setSubmitted(true);
     } catch (submitError) {
       setError(submitError?.code === "PERMISSION_DENIED" || submitError?.code === "permission-denied"
-        ? "This QR code has expired or is invalid. Ask your instructor to refresh it."
+        ? "Your check-in couldn't be accepted. The QR may have been refreshed or the class removed, class requirements may have changed, or your details may not meet the class rules. Use the current QR and check all required fields. If it still fails, ask your instructor to verify the QR and class settings."
         : databaseErrorMessage(submitError, "submit your check-in"));
     }
   };
@@ -292,7 +302,7 @@ function StudentCheckInPage({ authStatus, user }) {
     return <StudentMessage title="Check-in unavailable" message="This QR link is incomplete. Ask your instructor for a current code." />;
   }
   if (authStatus === "error") {
-    return <StudentMessage title="Check-in unavailable" message={error || firebaseConfigError || "Firebase guest access is unavailable. Contact your instructor."} />;
+    return <StudentMessage title="Check-in unavailable" message={error || firebaseConfigError || "Guest access is unavailable right now. Please contact your instructor."} />;
   }
   if (authStatus !== "ready" || loading) return <StudentMessage title="Loading…" />;
   if (error && !classInfo) return <StudentMessage title="Check-in unavailable" message={error} />;
@@ -383,6 +393,21 @@ function buildCheckInUrl(classItem) {
   url.searchParams.set("checkin", classItem.id);
   url.searchParams.set("code", classItem.sessionCode);
   return url.toString();
+}
+
+function openQrImageInNewTab(imageDataUrl) {
+  const qrWindow = window.open("", "_blank");
+  if (!qrWindow) return false;
+
+  qrWindow.opener = null;
+  qrWindow.document.title = "Check-in QR code";
+  qrWindow.document.body.style.cssText = "margin:0;min-height:100vh;display:grid;place-items:center;background:#fff";
+  const image = qrWindow.document.createElement("img");
+  image.src = imageDataUrl;
+  image.alt = "Check-in QR code";
+  image.style.cssText = "display:block;width:min(100vw, 600px);height:auto";
+  qrWindow.document.body.replaceChildren(image);
+  return true;
 }
 
 function ClassWorkspace({
@@ -628,7 +653,16 @@ function ClassWorkspace({
                   >
                     Refresh code
                   </button>
-                  <button className="secondary" type="button" disabled={!qrImage} onClick={() => window.open(qrImage, "_blank", "noopener,noreferrer")}>
+                  <button
+                    className="secondary"
+                    type="button"
+                    disabled={!qrImage}
+                    onClick={() => {
+                      if (!openQrImageInNewTab(qrImage)) {
+                        onError("Your browser blocked the new tab. Allow pop-ups and try again.");
+                      }
+                    }}
+                  >
                     Open QR in new tab
                   </button>
                   <button
@@ -1073,7 +1107,7 @@ export default function App() {
     try {
       const email = usernameToAuthEmail(username);
       if (!auth) {
-        setError(firebaseConfigError || "Firebase Authentication is unavailable.");
+        setError(firebaseConfigError || "Sign-in is unavailable right now. Please contact your instructor.");
         return;
       }
       if (view === "signup") {
@@ -1096,7 +1130,7 @@ export default function App() {
 
   const continueAsGuest = async () => {
     if (!auth) {
-      setError(firebaseConfigError || "Firebase Authentication is unavailable.");
+      setError(firebaseConfigError || "Guest access is unavailable right now. Please contact your instructor.");
       return;
     }
     setBusy(true);
@@ -1129,7 +1163,7 @@ export default function App() {
       throw new Error("Guest accounts can create only one class. Create an account to manage more classes.");
     }
     const classRef = push(ref(database, `owners/${user.uid}/classes`));
-    if (!classRef.key) throw new Error("Firebase did not create a class ID.");
+    if (!classRef.key) throw new Error("Could not prepare the new class. Please try again.");
     const classItem = {
       name,
       meetingTime: "09:00",
@@ -1245,7 +1279,7 @@ export default function App() {
       await updateProfile(auth.currentUser, { displayName: cleanDisplayName });
       setUser({ ...auth.currentUser });
     } catch (profileError) {
-      setError(`Could not save your profile: ${profileError?.message ?? "unknown authentication error"}`);
+      setError("Could not save your profile. Please try again. If the problem continues, contact your instructor.");
       throw profileError;
     } finally {
       setBusy(false);
@@ -1269,9 +1303,9 @@ export default function App() {
         throw new Error("The current password is incorrect.", { cause: passwordError });
       }
       if (passwordError?.code === "auth/weak-password") {
-        throw new Error("Choose a stronger password that meets Firebase's password policy.", { cause: passwordError });
+        throw new Error("Choose a stronger password that meets the account's password requirements.", { cause: passwordError });
       }
-      throw new Error(`Could not change your password: ${passwordError?.message ?? "unknown authentication error"}`, { cause: passwordError });
+      throw new Error("Could not change your password. Please try again. If the problem continues, contact your instructor.", { cause: passwordError });
     } finally {
       setBusy(false);
     }
@@ -1299,7 +1333,7 @@ export default function App() {
       await signOut(auth);
       setView("home");
     } catch (endError) {
-      throw new Error(`Could not end the guest session safely: ${endError?.message ?? "unknown error"}`, { cause: endError });
+      throw new Error("Could not end your guest session. Check whether you're still signed in, then try again.", { cause: endError });
     } finally {
       setBusy(false);
     }

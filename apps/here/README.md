@@ -24,7 +24,7 @@ Teachers can create multiple classes, customize meeting times and discussion pro
 
 The Firebase database starts with no sample classes or student records. Existing browser-local data from the earlier prototype is not automatically migrated.
 
-Known issue: the browser suite currently reproduces a permission error when ending a guest session, and an ambiguous locator in the class-settings test. See [current test status](../../docs/testing/README.md#known-existing-here-browser-failures). Guest data may remain when cleanup fails.
+Known issue: the browser suite has an ambiguous locator in the class-settings test. Guest-session cleanup now requires the updated owner-only deletion rule in `database.rules.json`; deploy it with `firebase deploy --only database` from `apps/here/`. See [current test status](../../docs/testing/README.md#known-existing-here-browser-issue).
 
 ## Firebase authentication and class storage
 
