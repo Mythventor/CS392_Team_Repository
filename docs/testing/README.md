@@ -29,7 +29,7 @@ From `apps/passdown/`: run `npm test` (unit + React component tests), `npm run l
 | [tests/rules/deals.rules.test.mjs](../../apps/passdown/tests/rules/deals.rules.test.mjs) | 14 | Offer validation, participant access, atomic item reservations, cancellations, sale completion, pickup confirmation, and messages. |
 | [tests/rules/firestore.rules.test.mjs](../../apps/passdown/tests/rules/firestore.rules.test.mjs) | 10 | Profile ownership and validation, public browsing, listing ownership, and default-deny access. |
 
-Passdown currently has **91 tests**: 31 unit cases, 36 React component cases, and 24 Firestore rule cases. Negative security tests deliberately produce permission-denied emulator logs; success means the test runner exits with zero failures.
+Passdown currently has **95 tests**: 31 unit cases, 36 React component cases, 24 Firestore rule cases, and 4 Playwright browser cases. Negative security tests deliberately produce permission-denied emulator logs; success means the test runner exits with zero failures.
 
 The table above covers domain logic and Firebase rules. The React component suite below renders the actual screens. The old lending/loan tests are no longer part of the resale app.
 
@@ -64,3 +64,7 @@ The browser suite has an ambiguous locator in the guest class-settings test:
 - **Guest class settings:** `getByLabel("Discussion prompt")` matches both the textarea and the requirement checkbox; the test needs an exact locator.
 
 The end-session permission issue is addressed by an owner-only rule that allows deleting a class's entire check-in subtree. Deploy the updated `apps/here/database.rules.json` before relying on the fix. Its browser test could not be rerun locally because the Firebase emulator requires JDK 21 or newer; this environment has Java 8. The unit tests and production build pass.
+
+## Passdown browser tests
+
+From `apps/passdown/`, install Chromium with `npx playwright install chromium`, then run `npm run test:e2e`. Four Playwright tests cover seeded Firestore browsing/search/details, clearing filters, protected profile routing, and Auth emulator Google sign-in plus Firestore profile persistence and sign-out. Playwright starts and stops Auth, Firestore, and Vite using `demo-passdown`; do not run another emulator session concurrently. See the [Passdown setup guide](../../apps/passdown/README.md#playwright-browser-tests-with-firebase-emulators).

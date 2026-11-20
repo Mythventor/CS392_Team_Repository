@@ -146,3 +146,20 @@ Deal rules are tested in `tests/rules/deals.rules.test.mjs` (`npm run test:rules
 Firebase subscriptions and writes are mocked at the data boundary, and authentication is supplied through the real AuthContext. Routing, domain validation, forms, and child components run normally. Tests make no live Google, Firebase, or Cloudinary requests. The component suite verifies UI behavior; the separate 24 Firestore emulator tests verify backend authorization and transaction rules.
 
 `npm test` runs unit and component tests together in CI. `npm run test:rules` remains a separate emulator command. There are **91 automated cases** across the three suites: 31 unit, 36 component, and 24 security-rule tests.
+
+## Playwright browser tests with Firebase emulators
+
+Install dependencies and Chromium once (Node.js 24.12+, JDK 21+, and the global Firebase CLI are required):
+
+```sh
+cd apps/passdown
+npm ci
+npx playwright install chromium
+npm run test:e2e
+```
+
+Playwright starts Auth (9099), Firestore (8080), and Vite (5173), seeds ten sample listings, and shuts down the servers afterward. Stop other emulator/dev-server sessions first. No Firebase login or production credentials are needed. The configuration forces `demo-passdown` and emulator connections even when `.env.local` contains production settings.
+
+The four Chromium examples cover listing search and detail navigation, clearing empty search results, the signed-out profile redirect, and Google emulator sign-in with profile saving, reload persistence, and sign-out. They use the real Firebase SDK against the emulators, without mocked Firebase calls or Cloudinary uploads.
+
+Use `npm run test:e2e -- --headed` to watch, `npm run test:e2e:ui` for interactive debugging, or `npx playwright show-report` to open the last HTML report. Failed tests retain screenshots and traces under the ignored `test-results/` directory.
