@@ -65,3 +65,7 @@ The five-case browser suite currently reports three passes and two failures, rep
 - **End guest session:** deleting guest data is rejected by the Realtime Database rules, so the app remains in the guest workspace with a permission error.
 
 These issues predate the folder/name cleanup. The unit tests, production builds, and Passdown security-rule tests pass. Review guest cleanup before relying on it; an attempted end-session action can fail instead of deleting data.
+
+## Passdown browser tests
+
+From `apps/passdown/`, install Chromium with `npx playwright install chromium`, then run `npm run test:e2e`. Four Playwright tests cover seeded Firestore browsing/search/details, clearing filters, protected profile routing, and Auth emulator Google sign-in plus Firestore profile persistence and sign-out. Playwright starts and stops Auth, Firestore, and Vite using `demo-passdown`; do not run another emulator session concurrently. See the [Passdown setup guide](../../apps/passdown/README.md#playwright-browser-tests-with-firebase-emulators).
