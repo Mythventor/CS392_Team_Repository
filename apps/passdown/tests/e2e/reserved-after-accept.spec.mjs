@@ -5,6 +5,8 @@
 // Then the calculator is marked as Reserved for every other student
 //
 // Runs against the local Auth and Firestore emulators started by playwright.config.mjs.
+// Students sign in with emulator test accounts instead of Google's pop-up, which is
+// slow and unreliable on GitHub's CI machines.
 import { test, expect } from "@playwright/test";
 
 const PROJECT = "demo-passdown";
@@ -13,37 +15,35 @@ const FIRESTORE = `http://127.0.0.1:8080/v1/projects/${PROJECT}/databases/(defau
 const ADMIN = { Authorization: "Bearer owner", "Content-Type": "application/json" };
 const ITEM_ID = "e2e-reserved-calculator";
 
-const SAM = { name: "Sam Rivera", email: "sam.reserved@example.com" };
-const ALEX = { name: "Alex Kim", email: "alex.reserved@example.com" };
-const JO = { name: "Jo Park", email: "jo.reserved@example.com" };
-const KIM = { name: "Kim Lee", email: "kim.reserved@example.com" };
+const PASSWORD = "e2e-password";
+// Fixed uids, so the calculator can belong to Sam before Sam opens the app.
+const SAM = { uid: "e2e-sam", name: "Sam Rivera", email: "sam.reserved@example.com" };
+const ALEX = { uid: "e2e-alex", name: "Alex Kim", email: "alex.reserved@example.com" };
+const JO = { uid: "e2e-jo", name: "Jo Park", email: "jo.reserved@example.com" };
+const KIM = { uid: "e2e-kim", name: "Kim Lee", email: "kim.reserved@example.com" };
 
-// Every person gets their own browser context, like using a separate browser.
-async function signIn(browser, person) {
-  const page = await (await browser.newContext()).newPage();
-  await page.goto("/signin?next=%2Fbrowse");
-  const popupPromise = page.waitForEvent("popup");
-  await page.getByRole("button", { name: "Continue with Google" }).click();
-  const popup = await popupPromise;
-  await popup.getByRole("button", { name: "Add new account" }).click();
-  await popup.getByLabel("Email", { exact: true }).fill(person.email);
-  await popup.getByLabel("Display name", { exact: true }).fill(person.name);
-  await popup.getByRole("button", { name: /^Sign in with Google/ }).click();
-  await expect(page.getByRole("link", { name: `Your profile, ${person.name}` })).toBeVisible();
-  return page;
-}
-
-// The Auth emulator picks each account's uid; look it up by email.
-async function uidOf(person) {
-  const response = await fetch(`http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts:query`, {
+// Creates the person's account in the Auth emulator (if it isn't there yet).
+async function createAccount(person) {
+  const response = await fetch(`http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/projects/${PROJECT}/accounts`, {
     method: "POST",
     headers: ADMIN,
-    body: JSON.stringify({ returnUserInfo: true }),
+    body: JSON.stringify({ localId: person.uid, displayName: person.name, email: person.email, password: PASSWORD }),
   });
-  const { userInfo = [] } = await response.json();
-  const account = userInfo.find((user) => user.email === person.email);
-  if (!account) throw new Error(`No emulator account for ${person.email}`);
-  return account.localId;
+  if (!response.ok && !(await response.text()).includes("DUPLICATE")) {
+    throw new Error(`Could not create a test account for ${person.name}: ${response.status}`);
+  }
+}
+
+// Signs the person in without Google's pop-up (see window.__e2eSignIn in src/lib/firebase.js).
+// Each person gets their own browser context, like using a separate browser.
+async function signIn(browser, person) {
+  await createAccount(person);
+  const page = await (await browser.newContext()).newPage();
+  await page.goto("/browse");
+  await page.waitForFunction(() => typeof window.__e2eSignIn === "function");
+  await page.evaluate((login) => window.__e2eSignIn(login), { email: person.email, password: PASSWORD });
+  await expect(page.getByRole("link", { name: `Your profile, ${person.name}` })).toBeVisible();
+  return page;
 }
 
 async function seedCalculator(ownerId) {
@@ -93,8 +93,8 @@ test.afterEach(async () => {
 
 test("accepting Alex's offer reserves the calculator for Alex only", async ({ browser }) => {
   // Given: Sam is selling a calculator, Jo offered $30 and Alex offered $40
+  await seedCalculator(SAM.uid);
   const sam = await signIn(browser, SAM);
-  await seedCalculator(await uidOf(SAM));
   const jo = await signIn(browser, JO);
   const alex = await signIn(browser, ALEX);
   const joDeal = await makeOffer(jo, 30);
