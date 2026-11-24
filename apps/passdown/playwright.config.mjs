@@ -25,6 +25,9 @@ export default defineConfig({
       VITE_FIREBASE_AUTH_DOMAIN: "demo-passdown.firebaseapp.com",
       VITE_FIREBASE_PROJECT_ID: "demo-passdown",
       VITE_FIREBASE_APP_ID: "demo-app",
+      // Photo uploads are mocked in tests (mockPhotoUpload in tests/e2e/helpers.mjs).
+      VITE_CLOUDINARY_CLOUD_NAME: "e2e-test",
+      VITE_CLOUDINARY_UPLOAD_PRESET: "e2e-test",
     },
   },
 });

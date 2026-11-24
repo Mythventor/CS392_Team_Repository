@@ -1,4 +1,7 @@
 import { test, expect } from "@playwright/test";
+import { signInOn } from "./helpers.mjs";
+
+const STUDENT = { uid: "e2e-student", name: "Playwright Student", email: "playwright@example.com" };
 
 test("browse seeded Firestore listings, filter, and open an item", async ({ page }) => {
   await page.goto("/browse");
@@ -25,15 +28,10 @@ test("protected profile redirects to sign-in", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Continue with Google" })).toBeVisible();
 });
 
-test("emulated Google sign-in saves a profile in Firestore", async ({ page }) => {
-  await page.goto("/signin?next=%2Fprofile");
-  const popupPromise = page.waitForEvent("popup");
-  await page.getByRole("button", { name: "Continue with Google" }).click();
-  const popup = await popupPromise;
-  await popup.getByRole("button", { name: "Add new account" }).click();
-  await popup.getByLabel("Email", { exact: true }).fill("playwright@example.com");
-  await popup.getByLabel("Display name", { exact: true }).fill("Playwright Student");
-  await popup.getByRole("button", { name: /^Sign in with Google/ }).click();
+// Signs in with an emulator test account instead of the Google pop-up, whose
+// "Add new account" form never shows its Email field in Playwright.
+test("emulated sign-in saves a profile in Firestore", async ({ page }) => {
+  await signInOn(page, STUDENT, "/signin?next=%2Fprofile");
   await expect(page.getByRole("heading", { name: "Your profile" })).toBeVisible();
   await page.getByLabel("Bio").fill("Testing with local Firebase emulators.");
   await page.getByRole("button", { name: "Save changes" }).click();
