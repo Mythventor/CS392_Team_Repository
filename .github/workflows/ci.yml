@@ -1,0 +1,77 @@
+name: CI
+
+# Playwright end-to-end (E2E) acceptance tests for Passdown, run against the
+# Firebase Auth and Firestore emulators. Lint, unit tests, rules tests, build and
+# deploy are in passdown.yml.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/passdown/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    paths:
+      - 'apps/passdown/**'
+      - '.github/workflows/ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  FIREBASE_TOOLS_VERSION: 15.31.0
+
+jobs:
+  e2e:
+    name: E2E tests (Playwright)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: apps/passdown
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/passdown/package-lock.json
+
+      # The Firebase emulators are written in Java and need Java 21 or newer.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Cache Firebase emulators
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ env.FIREBASE_TOOLS_VERSION }}
+
+      - run: npm ci
+      - run: npm install --global firebase-tools@${{ env.FIREBASE_TOOLS_VERSION }}
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      # playwright.config.mjs starts the Auth and Firestore emulators (demo-passdown
+      # project, seeded with sample listings) and Vite with VITE_USE_EMULATORS=true,
+      # which is what src/lib/firebase.js checks before connecting to the emulators.
+      - name: Run Playwright tests against the Firebase emulators
+        run: npm run test:e2e
+
+      - name: Upload Playwright report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-report
+          path: |
+            apps/passdown/playwright-report/
+            apps/passdown/test-results/
+          retention-days: 7
