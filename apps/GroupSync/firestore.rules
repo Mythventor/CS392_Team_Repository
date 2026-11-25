@@ -1,0 +1,52 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
+    function member(project) { return signedIn() && request.auth.token.email in project.members; }
+    function projectData(id) { return get(/databases/$(database)/documents/projects/$(id)).data; }
+    function projectAfter(id) { return getAfter(/databases/$(database)/documents/projects/$(id)).data; }
+    function validProject(p) {
+      return p.keys().hasAll(['name','description','due','owner','members'])
+        && p.keys().hasOnly(['name','description','due','owner','members'])
+        && p.name is string && p.name.size() > 0 && p.name.size() <= 100
+        && p.description is string && p.description.size() <= 1000
+        && p.due is string && p.due.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && p.members is list && p.members.size() > 0 && p.members.size() <= 30
+        && p.owner in p.members;
+    }
+    match /projects/{projectId} {
+      allow read: if member(resource.data);
+      allow create: if signedIn() && validProject(request.resource.data)
+        && request.resource.data.owner == request.auth.token.email;
+      allow update: if member(resource.data) && resource.data.owner == request.auth.token.email
+        && validProject(request.resource.data) && request.resource.data.owner == resource.data.owner;
+      allow delete: if false;
+      match /tasks/{taskId} {
+        function validTask(t) {
+          return t.keys().hasAll(['id','title','description','assignee','status','priority','due','evidence'])
+            && t.keys().hasOnly(['id','title','description','assignee','status','priority','due','evidence'])
+            && t.id == taskId && t.title is string && t.title.size() > 0 && t.title.size() <= 200
+            && t.description is string && t.description.size() <= 3000
+            && t.evidence is string && t.evidence.size() <= 3000
+            && (t.assignee == '' || t.assignee in projectAfter(projectId).members)
+            && t.status in ['To do','In progress','Done'] && t.priority in ['Low','Medium','High']
+            && t.due is string && (t.due == '' || t.due.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+        }
+        allow read: if member(projectData(projectId));
+        allow create, update: if member(projectAfter(projectId)) && validTask(request.resource.data);
+        allow delete: if member(projectData(projectId));
+      }
+      match /events/{eventId} {
+        allow read: if member(projectData(projectId));
+        allow create: if member(projectAfter(projectId))
+          && request.resource.data.keys().hasOnly(['id','actor','text','evidence','at'])
+          && request.resource.data.id == eventId
+          && request.resource.data.actor == request.auth.token.email
+          && request.resource.data.text is string && request.resource.data.text.size() <= 1000
+          && request.resource.data.evidence is string && request.resource.data.evidence.size() <= 3000
+          && request.resource.data.at is string && request.resource.data.at.size() <= 40;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

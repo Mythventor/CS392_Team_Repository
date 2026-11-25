@@ -1,0 +1,66 @@
+name: GroupSync
+on:
+  pull_request:
+    paths: ['apps/GroupSync/**', '.github/workflows/groupsync.yml']
+  push:
+    branches: [main]
+    paths: ['apps/GroupSync/**', '.github/workflows/groupsync.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: groupsync-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+defaults:
+  run:
+    working-directory: apps/GroupSync
+env:
+  FIREBASE_TOOLS_VERSION: 15.31.0
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/GroupSync/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci
+      - run: npm install --global firebase-tools@${{ env.FIREBASE_TOOLS_VERSION }}
+      - run: npm run lint
+      - run: npm test
+      - run: npm run test:rules
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: groupsync-dist
+          path: apps/GroupSync/dist
+  deploy:
+    permissions:
+      contents: read
+      id-token: write
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: groupsync-production
+      url: https://groupsync-cs392.web.app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/GroupSync/package-lock.json
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: projects/649256389631/locations/global/workloadIdentityPools/groupsync-github/providers/github
+          service_account: groupsync-deploy@groupsync-cs392.iam.gserviceaccount.com
+      - run: npm ci
+      - run: npm run build
+      - run: npx --yes firebase-tools@${{ env.FIREBASE_TOOLS_VERSION }} deploy --only firestore:rules,hosting --project groupsync-cs392 --non-interactive
